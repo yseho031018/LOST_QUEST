@@ -1,0 +1,7 @@
+.xp-gain-toast-region{position:fixed;top:calc(14px + env(safe-area-inset-top, 0px));left:0;right:0;display:flex;justify-content:center;pointer-events:none;z-index:90}
+.xp-gain-toast{display:flex;align-items:center;gap:9px;padding:11px 18px;border-radius:999px;background:#13324a;color:#fff;box-shadow:0 10px 28px #0f22313d;font-size:0.9375rem;animation:xp-gain-pop 3.5s ease forwards}
+.xp-gain-toast svg{color:#ffd166}
+.xp-gain-toast strong{font-size:1.0625rem;color:#ffd166;letter-spacing:-.2px}
+.xp-gain-toast span{font-size:0.8125rem;color:#c8d6e3}
+@keyframes xp-gain-pop{0%{opacity:0;transform:translateY(-12px) scale(.92)}10%{opacity:1;transform:translateY(0) scale(1.04)}18%{transform:scale(1)}85%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){.xp-gain-toast{animation:none}}

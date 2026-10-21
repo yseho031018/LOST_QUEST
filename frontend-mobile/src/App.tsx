@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes, Link } from 'react-router-dom';
 import Layout from './components/Layout';
+import XpGainToast from './components/XpGainToast';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
 import ItemDetailPage from './pages/ItemDetailPage';
@@ -22,7 +23,7 @@ const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
 const PhotoSearchPage = lazy(() => import('./pages/PhotoSearchPage'));
 
 export default function App() {
-  return <Layout><Suspense fallback={<div className="page-container empty-state" role="status"><span className="loading-dot" />화면을 준비하고 있어요.</div>}>
+  return <Layout><XpGainToast /><Suspense fallback={<div className="page-container empty-state" role="status"><span className="loading-dot" />화면을 준비하고 있어요.</div>}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/search" element={<SearchPage />} />
