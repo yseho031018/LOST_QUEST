@@ -65,6 +65,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(409).body(ApiError.of(409, "EMAIL_ALREADY_EXISTS", ex.getMessage(), request.getRequestURI()));
     }
 
+    @ExceptionHandler(SocialLoginUnavailableException.class)
+    public ResponseEntity<ApiError> handleSocialLoginUnavailable(SocialLoginUnavailableException ex, HttpServletRequest request) {
+        return ResponseEntity.status(503).body(ApiError.of(503, "SOCIAL_LOGIN_UNAVAILABLE", ex.getMessage(), request.getRequestURI()));
+    }
+
     /** 경찰청 OpenAPI failures. Only the kind and a key-free detail are logged; never the request URL. */
     @ExceptionHandler(ExternalApiException.class)
     public ResponseEntity<ApiError> handleExternalApi(ExternalApiException ex, HttpServletRequest request) {

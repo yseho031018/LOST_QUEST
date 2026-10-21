@@ -4,7 +4,9 @@ Sites 프론트엔드 배포와 로컬·외부 배포 검증 구분은 [Sites �
 
 분실물 통합 탐색 팀 프로젝트입니다. 기존 React 프론트엔드 프로토타입에 Java 21 + Spring Boot + JPA + MySQL 백엔드의 기본 틀을 추가했습니다.
 
-현재 서버 기능은 **회원가입·로그인, 분실물·습득물·사진 등록·조회·수정·삭제, 경찰청 공공데이터 조회, 규칙 기반 매칭 추천과 알림, 반환 요청·소유자 확인·승인·QR 검증·최종 완료, 경험치와 활동 알림**입니다. 회원이 만드는 기록은 MySQL `lost_quest`에 저장합니다. 프론트엔드는 서버 기록을 읽으며, 브라우저의 예시 프로필·물품·반환 데이터는 사용하지 않습니다. 두 사진의 종류·외형·색상을 비교하는 로컬 AI 분석은 브라우저 안에서 실행되며, AWS 배포는 아직 포함하지 않습니다.
+현재 서버 기능은 **회원가입·로그인(이메일, 구글 간편 로그인), 분실물·습득물·사진 등록·조회·수정·삭제, 경찰청 공공데이터 조회, 규칙 기반 매칭 추천과 알림, 반환 요청·소유자 확인·승인·QR 검증·최종 완료, 경험치와 활동 알림**입니다. 회원이 만드는 기록은 MySQL `lost_quest`에 저장합니다. 프론트엔드는 서버 기록을 읽으며, 브라우저의 예시 프로필·물품·반환 데이터는 사용하지 않습니다. 두 사진의 종류·외형·색상을 비교하는 로컬 AI 분석은 브라우저 안에서 실행되며, AWS 배포는 아직 포함하지 않습니다.
+
+구글 간편 로그인 설정과 DB 변경은 [구글 간편 로그인 가이드](계획서및회의록/14_구글_간편_로그인.md)를 참고하세요.
 
 최신 저장 구조와 반환 이용 방법은 [이메일 검증·전체 DB 저장 가이드](계획서및회의록/11_이메일_검증과_전체_DB_저장.md), macOS 실행 방법은 [전체 실행 가이드](계획서및회의록/10_macOS_전체_실행_가이드.md)를 참고하세요.
 
@@ -156,6 +158,7 @@ Copy-Item application-local.example.yml application-local.yml
 | GET | `/api/public-items/filters` | 경찰청 공통코드 기반 지역·물품분류·색상 필터 목록 |
 | POST | `/api/auth/signup` | 회원가입, 공개. `201` + 사용자 DTO |
 | POST | `/api/auth/login` | 로그인, 공개. `200` + Access Token |
+| POST | `/api/auth/social/google` | 구글 ID 토큰으로 로그인·가입, 공개. `200` + Access Token 또는 `EMAIL_REQUIRED` |
 | GET | `/api/auth/me` | 현재 사용자, `Authorization: Bearer <token>` 필요 |
 | GET | `/api/me/activity` | 내 프로필·반환 기록·활동 소식 |
 | POST | `/api/me/activity/read-all` | 내 활동 소식 모두 읽음 |
@@ -229,15 +232,22 @@ ALTER TABLE found_items ADD COLUMN region VARCHAR(20) NULL;
 // POST /api/auth/signup  — email(형식, ≤254), password(8~64자, ≤72바이트), nickname(공백 불가, ≤20)
 { "email": "hunter@example.com", "password": "********", "nickname": "로스트헌터" }
 // 201
-{ "id": 1, "email": "hunter@example.com", "nickname": "로스트헌터", "role": "USER", "createdAt": "2026-09-29T01:30:49Z" }
+{ "id": 1, "email": "hunter@example.com", "nickname": "로스트헌터", "role": "USER", "createdAt": "2026-09-29T01:30:49Z", "hasPassword": true }
 
 // POST /api/auth/login
 { "email": "hunter@example.com", "password": "********" }
 // 200
 { "accessToken": "<JWT>", "tokenType": "Bearer", "expiresIn": 3600,
-  "user": { "id": 1, "email": "hunter@example.com", "nickname": "로스트헌터", "role": "USER", "createdAt": "..." } }
+  "user": { "id": 1, "email": "hunter@example.com", "nickname": "로스트헌터", "role": "USER", "createdAt": "...", "hasPassword": true } }
 
 // GET /api/auth/me  (Authorization: Bearer <JWT>) → 200, signup 응답과 같은 사용자 DTO
+
+// POST /api/auth/social/google — credential: 구글 버튼이 준 ID 토큰, email: EMAIL_REQUIRED 응답 뒤에만 보냄
+{ "credential": "<Google ID token>" }
+// 200: 로그인 또는 가입 완료. login 응답과 같은 필드에 status가 붙고 user.hasPassword는 false
+{ "status": "SIGNED_IN", "accessToken": "<JWT>", "tokenType": "Bearer", "expiresIn": 3600, "user": { "...": "...", "hasPassword": false } }
+// 200: 구글이 확인된 이메일을 주지 않은 새 계정. 아무것도 저장하지 않았으며 같은 credential과 email로 다시 요청
+{ "status": "EMAIL_REQUIRED" }
 ```
 
 - 회원가입 이메일은 `da@ee`처럼 확장자가 없는 주소, 빈 도메인·잘못된 도메인 구분을 거부합니다. Gmail·Naver·회사·학교 주소를 허용하며, 실제 메일함 존재 여부는 검사하지 않습니다. 앞뒤 공백 제거·소문자로 저장하며 중복 가입은 `409 EMAIL_ALREADY_EXISTS`입니다.
@@ -246,6 +256,8 @@ ALTER TABLE found_items ADD COLUMN region VARCHAR(20) NULL;
 - JWT(HS256)에는 `sub`(사용자 ID), `role`, `iat`, `exp`, `iss`만 담고 이메일·비밀번호는 넣지 않습니다. 서명·만료(허용 오차 60초)·발급자를 검증하며, `role`은 `ROLE_USER`/`ROLE_ADMIN` Authority로 매핑되어 `@PreAuthorize("hasRole('ADMIN')")` 등에 사용할 수 있습니다.
 - 토큰 없음은 `401 UNAUTHORIZED`, 변조·만료·다른 키 서명은 `401 INVALID_TOKEN`, 인증은 되었지만 허용되지 않은 요청은 `403 FORBIDDEN`입니다.
 - 공개 GET API도 잘못된 `Authorization` 헤더를 보내면 401이 됩니다. 공개 API에는 토큰을 붙이지 마세요.
+- 구글 로그인은 서버가 구글 ID 토큰의 서명(구글 공개키)·발급자·대상(우리 클라이언트 ID)·만료를 검증한 뒤 우리 JWT를 발급합니다. 계정은 이메일이 아니라 구글 사용자 ID로 찾습니다. 구글 이메일이 이미 이메일 회원으로 가입되어 있으면 자동으로 합치지 않고 `409 EMAIL_ALREADY_EXISTS`를 반환합니다. 잘못되거나 만료된 구글 토큰은 `401 INVALID_SOCIAL_TOKEN`, 서버에 구글 클라이언트 ID가 없거나 구글 공개키를 받지 못하면 `503 SOCIAL_LOGIN_UNAVAILABLE`입니다.
+- 구글로 가입한 계정은 비밀번호가 없어 이메일·비밀번호 로그인과 비밀번호 변경을 할 수 없습니다.
 
 `/api/health`는 HTTP 서버 응답 확인용이며 DB의 지속적인 readiness 점검은 아닙니다. **JPA·MySQL 경로 확인에는 목록 API도 호출하세요.** DB 연결 및 스키마 준비에 실패하면 정상 애플리케이션 시작이 완료되지 않습니다.
 
@@ -289,7 +301,7 @@ LOST QUEST 백엔드가 경찰청 OpenAPI(XML)를 실시간으로 호출해 JSON
 
 ## 보안·오류 처리
 
-위 공개 GET API와 `POST /api/auth/signup`·`/api/auth/login`만 인증 없이 허용하고, `GET /api/images/{filename}`과 `GET /api/public-items/...`도 공개하며, `GET /api/auth/me`, `GET /api/lost-items/{id}/matches`(작성자 본인만), `/api/notifications/...`(본인 알림만)와 `POST /api/lost-items`·`/api/found-items`(JSON·multipart), 본인 물품의 `PUT`·`DELETE`는 인증을 요구하며, 나머지 허용되지 않은 요청은 기본 차단합니다. 폼 로그인·HTTP Basic·기본 생성 계정·서버 세션은 사용하지 않습니다(Stateless). JWT 검증은 Spring Security OAuth2 Resource Server(Nimbus)를 사용하며 자체 토큰 파서는 없습니다.
+위 공개 GET API와 `POST /api/auth/signup`·`/api/auth/login`·`/api/auth/social/google`만 인증 없이 허용하고, `GET /api/images/{filename}`과 `GET /api/public-items/...`도 공개하며, `GET /api/auth/me`, `GET /api/lost-items/{id}/matches`(작성자 본인만), `/api/notifications/...`(본인 알림만)와 `POST /api/lost-items`·`/api/found-items`(JSON·multipart), 본인 물품의 `PUT`·`DELETE`는 인증을 요구하며, 나머지 허용되지 않은 요청은 기본 차단합니다. 폼 로그인·HTTP Basic·기본 생성 계정·서버 세션은 사용하지 않습니다(Stateless). JWT 검증은 Spring Security OAuth2 Resource Server(Nimbus)를 사용하며 자체 토큰 파서는 없습니다.
 
 **CSRF 비활성화 이유:** CSRF는 브라우저가 쿠키·세션 같은 자격증명을 요청에 *자동으로* 붙이는 점을 악용합니다. 이 API는 세션·인증 쿠키를 만들지 않고, 자격증명은 프론트엔드 코드가 명시적으로 설정하는 `Authorization: Bearer` 헤더로만 전달되며, 다른 사이트는 이 헤더를 붙인 요청을 만들 수 없습니다(CORS 허용 Origin 제한, `credentials: omit`). 따라서 CSRF 토큰 없이도 위조 요청이 인증되지 않아 CSRF 보호를 끕니다. 이후 쿠키 기반 인증(예: HttpOnly Refresh Token 쿠키)을 도입하면 CSRF 정책을 다시 설계해야 합니다.
 

@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Compass, HeartHandshake, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import { useApp } from '../context/AppContext'
+import { ApiClientError } from '../services/apiClient'
 import { describeAuthError } from '../services/authApi'
 import { EMAIL_MESSAGE, isValidSignupEmail } from '../services/emailValidation'
 import './JourneyPages.css'
 
 export default function AuthPage() {
-  const { isLoggedIn, login, signup, profile, authUser } = useApp()
+  const { isLoggedIn, login, loginWithGoogle, signup, profile, authUser } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
   const isSignup = location.pathname === '/signup'
@@ -17,6 +19,9 @@ export default function AuthPage() {
   const [agreed, setAgreed] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  /** Held only in memory while a new Google account waits for an email; Google's ID token expires within an hour. */
+  const [googleCredential, setGoogleCredential] = useState<string | null>(null)
+  const [googleEmail, setGoogleEmail] = useState('')
   const params = new URLSearchParams(location.search)
   const requestedPath = params.get('returnTo') || '/mypage'
   const returnTo = requestedPath.startsWith('/') && !requestedPath.startsWith('//') && !requestedPath.includes('\\') ? requestedPath : '/mypage'
@@ -43,6 +48,35 @@ export default function AuthPage() {
       setSubmitting(false)
     }
   }
+
+  async function continueWithGoogle(credential: string, enteredEmail?: string) {
+    if (submitting) return
+    setSubmitting(true); setError('')
+    try {
+      if (await loginWithGoogle(credential, enteredEmail) === 'EMAIL_REQUIRED') { setGoogleCredential(credential); return }
+      setGoogleCredential(null); setGoogleEmail(''); setPassword('')
+      navigate(returnTo, { replace: true })
+    } catch (caught) {
+      setError(describeAuthError(caught))
+      // A rejected or expired Google token cannot be reused; the user signs in with Google again.
+      if (caught instanceof ApiClientError && caught.status === 401) setGoogleCredential(null)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function submitGoogleEmail(event: React.FormEvent) {
+    event.preventDefault()
+    if (!googleCredential) return
+    if (!googleEmail.trim()) { setError('이메일을 입력해 주세요.'); return }
+    if (!isValidSignupEmail(googleEmail)) { setError(EMAIL_MESSAGE); return }
+    void continueWithGoogle(googleCredential, googleEmail)
+  }
+
+  function cancelGoogleSignup() {
+    setGoogleCredential(null); setGoogleEmail(''); setError('')
+  }
+
   const edit = (setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => { setter(event.target.value); setError('') }
 
   return <div className="page-container auth-page">
@@ -68,7 +102,17 @@ export default function AuthPage() {
           <h2>{profile.name}님,<br />다시 만나 반가워요!</h2>
           <p className="muted">{authUser?.email} 계정으로 로그인되어 있어요.<br />소중한 물건을 찾는 여정을 이어가세요.</p>
           <Link className="button button-primary" to={returnTo}>계속 둘러보기 <ArrowRight size={17} /></Link>
-        </div> : <>
+        </div> : googleCredential ? <>
+          <span className="eyebrow">구글 계정으로 시작하기</span>
+          <h2>이메일을 알려 주세요</h2>
+          <p className="muted">구글 계정에서 확인된 이메일을 받지 못했어요.<br />로그인 계정에 저장할 이메일을 입력하면 가입이 끝나요.</p>
+          <form onSubmit={submitGoogleEmail} className="auth-form auth-google-email" noValidate>
+            <div className="form-field"><label htmlFor="auth-google-email">이메일</label><div className="auth-input"><Mail size={18} /><input id="auth-google-email" type="email" value={googleEmail} onChange={edit(setGoogleEmail)} maxLength={254} autoComplete="email" placeholder="you@example.com" /></div><small className="muted">이메일과 구글 계정의 이름(닉네임)이 저장돼요. 다음부터는 구글 버튼으로 바로 로그인해요.</small></div>
+            {error && <p className="field-error" role="alert" style={{ whiteSpace: 'pre-line' }}>{error}</p>}
+            <button type="submit" className="button button-primary auth-submit" disabled={submitting} aria-busy={submitting}>{submitting ? '처리 중이에요…' : '이메일 등록하고 시작하기'} <ArrowRight size={18} /></button>
+            <button type="button" className="button button-secondary auth-submit" disabled={submitting} onClick={cancelGoogleSignup}>취소</button>
+          </form>
+        </> : <>
           <span className="eyebrow">로스트퀘스트에 오신 것을 환영해요</span>
           <h2>{isSignup ? '함께 찾는 여정의 시작' : '다시 만나 반가워요'}</h2>
           <p className="muted">{isSignup ? '계정을 만들고 LOST QUEST를 시작해 보세요.' : '작은 친절이 모여, 소중한 일상을 되찾아요.'}</p>
@@ -84,6 +128,7 @@ export default function AuthPage() {
             {error && <p className="field-error" role="alert" style={{ whiteSpace: 'pre-line' }}>{error}</p>}
             <button type="submit" className="button button-primary auth-submit" disabled={submitting} aria-busy={submitting}>{submitting ? '처리 중이에요…' : isSignup ? '가입하고 시작하기' : '로그인'} <ArrowRight size={18} /></button>
           </form>
+          <GoogleSignInButton mode={isSignup ? 'signup' : 'signin'} disabled={submitting} onCredential={credential => void continueWithGoogle(credential)} />
           <div className="auth-demo-note"><ShieldCheck size={20} /><div><strong>안전하게 로그인해요</strong><p>회원·등록 물품·반환 기록과 경험치는 계정에 저장돼요. 로그인 상태는 이 브라우저 탭에서만 유지됩니다.</p></div></div>
           <p className="auth-browse">아직 둘러보는 중인가요? <Link to="/search">로그인 없이 물품 찾기 <ArrowRight size={14} /></Link></p>
         </>}

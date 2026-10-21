@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { changePassword as changePasswordRequest, login as loginRequest, restoreAuthSession, signup as signupRequest, updateNickname as updateNicknameRequest, type AuthUser, type SignupInput } from '../services/authApi';
+import { changePassword as changePasswordRequest, googleLogin as googleLoginRequest, login as loginRequest, restoreAuthSession, signup as signupRequest, updateNickname as updateNicknameRequest, type AuthUser, type LoginResult, type SignupInput } from '../services/authApi';
 import { clearAuthSession, saveAuthSession } from '../services/authSession';
 import { createReturn, describeActivityError, loadActivity, markActivityRead, returnAction } from '../services/activityApi';
 import { listAllServerItems } from '../services/itemApi';
@@ -13,6 +13,8 @@ interface AppContextValue extends AppData {
   /** False until the first public item list request settles, so screens can tell "loading" from "empty". */
   itemsReady: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Resolves EMAIL_REQUIRED when a new Google account needs an email; resend with the same credential and an email. */
+  loginWithGoogle: (credential: string, email?: string) => Promise<'SIGNED_IN' | 'EMAIL_REQUIRED'>;
   signup: (input: SignupInput) => Promise<void>;
   logout: () => void;
   updateNickname: (nickname: string) => Promise<void>;
@@ -103,12 +105,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [authExpiresAt, applySession]);
 
-  const login = async (email: string, password: string) => {
-    const version = ++authVersion.current;
-    const result = await loginRequest(email, password);
+  const startSession = (version: number, result: LoginResult) => {
     if (version !== authVersion.current) return;
     const session = saveAuthSession(result.accessToken, result.expiresIn);
     applySession(result.user, session.expiresAt);
+  };
+  const login = async (email: string, password: string) => {
+    const version = ++authVersion.current;
+    startSession(version, await loginRequest(email, password));
+  };
+  const loginWithGoogle = async (credential: string, email?: string) => {
+    const version = ++authVersion.current;
+    const result = await googleLoginRequest(credential, email);
+    if (result.status === 'SIGNED_IN') startSession(version, result.login);
+    return result.status;
   };
   const signup = async (input: SignupInput) => { await signupRequest(input); await login(input.email, input.password); };
   const logout = () => { authVersion.current += 1; clearAuthSession(); applySession(null, null); };
@@ -134,7 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requireSession(); await returnAction(id, action, body); await refreshData();
   };
   return <AppContext.Provider value={{
-    ...data, isLoggedIn: authUser !== null, authUser, authChecking, activityLoading, itemsReady, login, signup, logout, updateNickname, changePassword,
+    ...data, isLoggedIn: authUser !== null, authUser, authChecking, activityLoading, itemsReady, login, loginWithGoogle, signup, logout, updateNickname, changePassword,
     refreshData, createRequest, storageError,
     verifyOwner: async (id, answer) => { await act(id, 'verify-owner', { answer }); return true; },
     approveRequest: id => act(id, 'approve'),

@@ -4,7 +4,10 @@ import { useApp } from '../context/AppContext';
 import { describeAuthError, MAX_NICKNAME_LENGTH } from '../services/authApi';
 import './ProfileSettings.css';
 
-/** My page "내 정보": nickname and password changes. The email is the login ID and stays fixed. */
+/**
+ * My page "내 정보": nickname and password changes. The email is the login ID and stays fixed. Google sign-in
+ * accounts have no password, so they see how they sign in instead of the password form.
+ */
 export default function ProfileSettings() {
   const { authUser, updateNickname, changePassword } = useApp();
   const [nickname, setNickname] = useState(authUser?.nickname ?? '');
@@ -64,7 +67,10 @@ export default function ProfileSettings() {
       {nicknameState.error && <p className="field-error" role="alert">{nicknameState.error}</p>}
       {nicknameState.done && <p className="profile-settings-done" role="status"><CheckCircle2 size={16} aria-hidden="true" />{nicknameState.done}</p>}
     </form>
-    <form className="card profile-settings-card" onSubmit={event => void savePassword(event)} noValidate>
+    {authUser?.hasPassword === false ? <div className="card profile-settings-card">
+      <h3><KeyRound size={18} aria-hidden="true" />로그인 방법</h3>
+      <p className="muted">구글 계정으로 로그인하는 계정이라 비밀번호가 없어요. 로그인 화면에서 구글 버튼으로 로그인해 주세요.</p>
+    </div> : <form className="card profile-settings-card" onSubmit={event => void savePassword(event)} noValidate>
       <h3><KeyRound size={18} aria-hidden="true" />비밀번호 변경</h3>
       <p className="muted">현재 비밀번호를 확인한 뒤 바꿔요.</p>
       <label className="form-field" htmlFor="profile-current-password">현재 비밀번호
@@ -80,6 +86,6 @@ export default function ProfileSettings() {
         <button type="submit" className="button button-primary" disabled={passwordState.saving}>{passwordState.saving && <LoaderCircle size={16} className="spin" aria-hidden="true" />}비밀번호 변경</button></div>
       {passwordState.error && <p className="field-error" role="alert">{passwordState.error}</p>}
       {passwordState.done && <p className="profile-settings-done" role="status"><CheckCircle2 size={16} aria-hidden="true" />{passwordState.done}</p>}
-    </form>
+    </form>}
   </section>;
 }

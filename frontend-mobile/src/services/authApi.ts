@@ -9,6 +9,8 @@ export interface AuthUser {
   email: string;
   nickname: string;
   role: UserRole;
+  /** False for Google sign-in accounts, which have no password to change. */
+  hasPassword: boolean;
 }
 
 export interface LoginResult {
@@ -33,7 +35,15 @@ function parseAuthUser(value: unknown): AuthUser {
   if (typeof user.id !== 'number' || !Number.isSafeInteger(user.id) || typeof user.email !== 'string' ||
       typeof user.nickname !== 'string' || (user.role !== 'USER' && user.role !== 'ADMIN')) throw invalidResponse();
   // Whitelist fields so nothing unexpected (e.g. a password hash) is kept in app state.
-  return { id: user.id, email: user.email, nickname: user.nickname, role: user.role };
+  return { id: user.id, email: user.email, nickname: user.nickname, role: user.role, hasPassword: user.hasPassword !== false };
+}
+
+function parseLoginResult(value: unknown): LoginResult {
+  if (!value || typeof value !== 'object') throw invalidResponse();
+  const result = value as Record<string, unknown>;
+  if (typeof result.accessToken !== 'string' || !result.accessToken || result.tokenType !== 'Bearer' ||
+      typeof result.expiresIn !== 'number' || !(result.expiresIn > 0)) throw invalidResponse();
+  return { accessToken: result.accessToken, expiresIn: result.expiresIn, user: parseAuthUser(result.user) };
 }
 
 export async function signup(input: SignupInput, config: RequestConfig = {}): Promise<AuthUser> {
@@ -43,12 +53,23 @@ export async function signup(input: SignupInput, config: RequestConfig = {}): Pr
 }
 
 export async function login(email: string, password: string, config: RequestConfig = {}): Promise<LoginResult> {
-  const value = await apiRequest('/api/auth/login', { ...config, method: 'POST', body: { email: email.trim(), password } });
-  if (!value || typeof value !== 'object') throw invalidResponse();
-  const result = value as Record<string, unknown>;
-  if (typeof result.accessToken !== 'string' || !result.accessToken || result.tokenType !== 'Bearer' ||
-      typeof result.expiresIn !== 'number' || !(result.expiresIn > 0)) throw invalidResponse();
-  return { accessToken: result.accessToken, expiresIn: result.expiresIn, user: parseAuthUser(result.user) };
+  return parseLoginResult(await apiRequest('/api/auth/login', { ...config, method: 'POST', body: { email: email.trim(), password } }));
+}
+
+export type GoogleLoginResult = { status: 'SIGNED_IN'; login: LoginResult } | { status: 'EMAIL_REQUIRED' };
+
+/**
+ * Exchanges a Google ID token for our session. EMAIL_REQUIRED means Google gave no verified email for a new
+ * account and nothing was saved: call again with the same credential and an email the user entered.
+ */
+export async function googleLogin(credential: string, email?: string, config: RequestConfig = {}): Promise<GoogleLoginResult> {
+  const enteredEmail = email?.trim();
+  if (enteredEmail !== undefined && !isValidSignupEmail(enteredEmail)) throw new ApiClientError('INVALID_INPUT', EMAIL_MESSAGE);
+  const body = enteredEmail === undefined ? { credential } : { credential, email: enteredEmail };
+  const value = await apiRequest('/api/auth/social/google', { ...config, method: 'POST', body });
+  if (value && typeof value === 'object' && (value as Record<string, unknown>).status === 'EMAIL_REQUIRED') return { status: 'EMAIL_REQUIRED' };
+  if (!value || typeof value !== 'object' || (value as Record<string, unknown>).status !== 'SIGNED_IN') throw invalidResponse();
+  return { status: 'SIGNED_IN', login: parseLoginResult(value) };
 }
 
 export const MAX_NICKNAME_LENGTH = 20;
@@ -99,7 +120,7 @@ export function describeAuthError(error: unknown): string {
   if (!(error instanceof ApiClientError)) return '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.';
   if (error.serverCode === 'VALIDATION_ERROR' && error.fieldErrors.length > 0) {
     const labels: Record<string, string> = { email: '이메일', password: '비밀번호', nickname: '닉네임', passwordWithinBcryptLimit: '비밀번호',
-      currentPassword: '현재 비밀번호', newPassword: '새 비밀번호', newPasswordWithinBcryptLimit: '새 비밀번호' };
+      currentPassword: '현재 비밀번호', newPassword: '새 비밀번호', newPasswordWithinBcryptLimit: '새 비밀번호', credential: '구글 로그인 정보' };
     return error.fieldErrors.map(({ field, message }) => `${labels[field] ?? field}: ${message}`).join('\n');
   }
   return error.message;
