@@ -211,6 +211,35 @@ describe('explicit police source loading', () => {
     expect(container.textContent).toContain('서버 연결 불가'); await click(tabs()[0]);
     expect(container.textContent).not.toContain('서버 연결 불가'); expect(cards()).toHaveLength(1);
   });
+  it('explains a failed 경찰청 분실물 keyword search and clears the keyword back to the date listing', async () => {
+    const outage = new ApiClientError('HTTP_ERROR', '경찰청 공공데이터 서버가 요청을 처리하지 못했습니다.', 502, { serverCode: 'EXTERNAL_API_ERROR' });
+    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && query?.q) throw outage; return page(type); });
+    await mount('/search?source=public&type=lost&q=%EC%A7%80%EA%B0%91');
+    expect(listPoliceItems).toHaveBeenLastCalledWith('lost', expect.objectContaining({ q: '지갑' }));
+    expect(container.textContent).toContain('검색 서비스 일시 오류');
+    expect(container.textContent).toContain('경찰청 분실물 검색 서비스에 일시적인 문제가 있어요. 검색어를 지우고 날짜·지역·분류 조건으로 조회해 주세요.');
+    expect(container.textContent).not.toContain('서버 연결 불가');
+    const clear = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '검색어 지우기')!;
+    await click(clear);
+    expect(container.querySelector('output')?.textContent).toBe('/search?source=public&type=lost');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="물품 이름 또는 특징 검색"]')!.value).toBe('');
+    expect(vi.mocked(listPoliceItems).mock.calls.at(-1)?.[1]).not.toHaveProperty('q');
+    expect(cards()).toEqual([expect.stringContaining('경찰청 지갑')]);
+    expect(container.textContent).not.toContain('검색 서비스 일시 오류');
+  });
+  it('keeps the general notices for other failures: network, 경찰청 습득물 keyword and a lost listing without a keyword', async () => {
+    const outage = new ApiClientError('HTTP_ERROR', '경찰청 공공데이터 서버가 요청을 처리하지 못했습니다.', 502, { serverCode: 'EXTERNAL_API_ERROR' });
+    vi.mocked(listPoliceItems).mockRejectedValue(new ApiClientError('NETWORK_ERROR', '서버에 연결하지 못했어요.'));
+    await mount('/search?source=public&type=lost&q=%EC%A7%80%EA%B0%91');
+    expect(container.textContent).toContain('서버 연결 불가'); expect(container.textContent).not.toContain('검색어 지우기');
+    act(() => root.unmount()); root = createRoot(container);
+    vi.mocked(listPoliceItems).mockRejectedValue(outage);
+    await mount('/search?source=public&type=found&q=%EC%A7%80%EA%B0%91');
+    expect(container.textContent).toContain('서버 연결 불가'); expect(container.textContent).not.toContain('검색어 지우기');
+    act(() => root.unmount()); root = createRoot(container);
+    await mount('/search?source=public&type=lost');
+    expect(container.textContent).toContain('서버 연결 불가'); expect(container.textContent).not.toContain('검색어 지우기');
+  });
 
   it('does not run matching implicitly when a signed-in user opens home or LOST QUEST search', async () => {
     account.user = { id: 3 }; await mount('/', true); expectNoPolice();

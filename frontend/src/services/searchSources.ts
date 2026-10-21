@@ -24,6 +24,8 @@ export interface SourceState {
   pageLoading?: boolean;
   pageError?: { page: number; message: string };
   cache?: PoliceCacheInfo;
+  /** The server's ApiError code for a failed request (e.g. EXTERNAL_API_ERROR), when it sent one. */
+  errorCode?: string;
   refreshing?: boolean;
   refreshError?: string;
 }
@@ -54,6 +56,14 @@ export function applyPolicePage(previous: SourceState, result: SourceState, requ
       stale: previous.cache.stale || result.cache.stale, refreshError: result.cache.refreshError ?? previous.cache.refreshError },
       lastSyncedAt: Math.min(Date.parse(previous.cache.fetchedAt), Date.parse(result.cache.fetchedAt)) } : {}),
     ...(previous.dataStatus === 'cached' ? { dataStatus: 'cached', lastSyncedAt: previous.lastSyncedAt } : {}) };
+}
+
+/**
+ * 경찰청 분실물 물품명 검색 API itself rejected the request (the server answered EXTERNAL_API_ERROR for a keyword
+ * query), as opposed to a network, tunnel or server outage, which keep the general connection notice.
+ */
+export function isPoliceLostKeywordOutage(key: SourceKey, state: SourceState, keyword: string): boolean {
+  return key === 'policeLost' && !!keyword.trim() && state.status === 'error' && state.errorCode === 'EXTERNAL_API_ERROR';
 }
 
 export function describeSourceError(cause: unknown): string {
