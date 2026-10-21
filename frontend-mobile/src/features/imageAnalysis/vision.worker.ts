@@ -1,8 +1,9 @@
 import { env, pipeline, RawImage, type ImageFeatureExtractionPipeline, type ZeroShotImageClassificationPipeline } from '@huggingface/transformers';
 import { CLASSIFIER_PROMPTS, categoryPrediction, manualCategory } from './categories';
 import { VISION_MODELS } from './modelConfig';
+import { createModelCachePreparation, ModelCacheRecoveryError } from '../modelLoading';
 
-env.allowLocalModels = true;
+env.allowLocalModels = !__ALLOW_REMOTE_MODELS__;
 env.allowRemoteModels = __ALLOW_REMOTE_MODELS__;
 env.localModelPath = '/models/';
 env.useBrowserCache = __ALLOW_REMOTE_MODELS__;
@@ -12,6 +13,7 @@ env.backends.onnx.wasm!.proxy = false;
 
 let extractor: Promise<ImageFeatureExtractionPipeline> | null = null;
 let classifier: Promise<ZeroShotImageClassificationPipeline> | null = null;
+const prepareModelCache = createModelCachePreparation(Object.values(VISION_MODELS), __ALLOW_REMOTE_MODELS__);
 // The library's generic pipeline union exceeds TypeScript's union size limit.
 const createExtractor = pipeline as unknown as (task: string, model: string, options: object) => Promise<ImageFeatureExtractionPipeline>;
 const createClassifier = pipeline as unknown as (task: string, model: string, options: object) => Promise<ZeroShotImageClassificationPipeline>;
@@ -37,6 +39,7 @@ function loadClassifier(id: number) {
 self.onmessage = async (event: MessageEvent<{ id: number; image: Blob; categoryId?: string; prompts?: string[] }>) => {
   const { id, image, categoryId = 'auto', prompts } = event.data;
   try {
+    await prepareModelCache();
     // Text ↔ photo: CLIP scores how well each English description fits this photo (softmax over the prompts).
     if (prompts) {
       if (!prompts.length || prompts.length > 64 || prompts.some(p => typeof p !== 'string' || !p || p.length > 200)) throw new Error('Invalid prompts');
@@ -73,8 +76,9 @@ self.onmessage = async (event: MessageEvent<{ id: number; image: Blob; categoryI
     }
     self.postMessage({ id, type: 'result', vector, category });
   } catch (error) {
+    console.error('[AI image model]', error);
     extractor = null;
     classifier = null;
-    self.postMessage({ id, type: 'error', message: error instanceof Error ? error.message : String(error) });
+    self.postMessage({ id, type: 'error', code: error instanceof ModelCacheRecoveryError ? 'MODEL_CACHE_RECOVERY_FAILED' : undefined, message: error instanceof Error ? error.message : String(error) });
   }
 };

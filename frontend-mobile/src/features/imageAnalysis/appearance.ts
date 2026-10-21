@@ -4,12 +4,13 @@ import { cosineSimilarity, validateImageFile } from './similarityMath';
 import type { AppearanceResult, CropRect, Progress } from './types';
 import type { CategoryPrediction } from './categories';
 import { VISION_MODELS } from './modelConfig';
+import { modelErrorMessage, MODEL_LOAD_MESSAGE } from '../modelLoading';
 
 let worker: Worker | null = null;
 let nextId = 0;
 type Extracted = { vector: number[]; category: CategoryPrediction };
 export type RankedPrompt = { label: string; score: number };
-type Reply = { id: number; type: string; vector?: number[]; category?: CategoryPrediction; ranked?: RankedPrompt[]; message?: string };
+type Reply = { id: number; type: string; vector?: number[]; category?: CategoryPrediction; ranked?: RankedPrompt[]; message?: string; code?: string };
 type Pending = { resolve: (reply: Reply) => void; reject: (error: Error) => void; loading: () => void };
 const pending = new Map<number, Pending>();
 
@@ -33,12 +34,15 @@ function request(payload: { image: Blob; categoryId?: string; prompts?: string[]
         if (event.data.type === 'loading') { task.loading(); return; }
         pending.delete(event.data.id);
         if ((event.data.type === 'result' && event.data.vector && event.data.category) || (event.data.type === 'describe' && event.data.ranked)) task.resolve(event.data);
-        else task.reject(new Error(`로컬 외형 모델을 실행하지 못했습니다. npm run setup:vision으로 파일을 준비해 주세요. 상세: ${event.data.message?.slice(0, 250) ?? '알 수 없는 응답'}`));
+        else {
+          console.error('[AI image analysis]', event.data.message ?? 'Invalid worker reply');
+          task.reject(new Error(modelErrorMessage(event.data.code)));
+        }
       };
-      worker.onerror = () => disposeWorker(new Error('외형 분석 작업을 실행하지 못했습니다. 브라우저를 새로고침하고 모델 파일을 확인해 주세요.'));
+      worker.onerror = event => { console.error('[AI image worker]', event); disposeWorker(new Error(MODEL_LOAD_MESSAGE)); };
     }
     const abort = () => disposeWorker(new DOMException('Aborted', 'AbortError'));
-    const timer = setTimeout(() => disposeWorker(new Error('로컬 외형 분석 대기 시간(180초)을 초과했습니다.')), 180_000);
+    const timer = setTimeout(() => disposeWorker(new Error('AI 분석 대기 시간(180초)을 초과했어요. 인터넷 연결을 확인하고 잠시 후 다시 시도해 주세요. 첫 실행에는 모델 다운로드에 시간이 걸릴 수 있어요.')), 180_000);
     const finish = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
     const id = ++nextId;
     pending.set(id, { resolve: reply => { finish(); resolve(reply); }, reject: error => { finish(); reject(error); }, loading });
