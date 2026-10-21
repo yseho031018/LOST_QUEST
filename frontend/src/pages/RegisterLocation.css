@@ -1,0 +1,5 @@
+.register-page .register-location-field { min-width:0; gap:8px; }
+.register-page .register-location-help { margin:0; color:#60788a; font-size:.8125rem; line-height:1.7; }
+.register-page .register-location-warning { display:flex; align-items:flex-start; gap:8px; margin:4px 0 0; padding:12px; border:1px solid #e4ce9e; border-radius:8px; background:#fff8e8; color:#77551e; font-size:.875rem; line-height:1.7; overflow-wrap:anywhere; }
+.register-location-warning>svg { flex-shrink:0; margin-top:3px; }
+.register-location-warning>span { min-width:0; }

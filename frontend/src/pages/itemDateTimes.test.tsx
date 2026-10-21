@@ -74,6 +74,7 @@ it('defaults to Korean today instead of a sample date, and submits a chosen even
   const date = container.querySelector<HTMLInputElement>('#item-date')!;
   expect(date.value).toBe('2026-10-10');
   expect(date.max).toBe('2026-10-10');
+  await enter('#item-location', '경기 성남시 신구대학교');
   await enter('#item-date', '2026-09-16');
   await submit();
   await enter('#ownership-question', '소품 색은?'); await enter('#ownership-answer', '검정');
@@ -86,6 +87,7 @@ it('defaults to Korean today instead of a sample date, and submits a chosen even
 it('rejects tomorrow using Korea time even if the browser clock uses another zone', async () => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-09T15:30:00Z'));
   await render(<RegisterPage />, '/register');
+  await enter('#item-location', '경기 성남시 신구대학교');
   await enter('#item-date', '2026-10-11'); await submit();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('미래 날짜는 선택할 수 없어요');
   expect(createServerItem).not.toHaveBeenCalled();
