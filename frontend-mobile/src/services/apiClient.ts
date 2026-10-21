@@ -1,3 +1,4 @@
+import { getRuntimeApiBaseUrl } from './runtimeConfig';
 import { getTunnelHeaders } from './tunnel';
 
 export interface ApiHealthResponse {
@@ -33,7 +34,7 @@ export class ApiClientError extends Error {
 
 /** Vite substitutes this public setting at startup/build time; it must not contain secrets. */
 export function getApiBaseUrl(): string {
-  return (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+  return getRuntimeApiBaseUrl() ?? (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
 }
 
 function healthUrl(baseUrl: string): string {
