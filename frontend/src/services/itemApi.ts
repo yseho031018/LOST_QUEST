@@ -3,6 +3,7 @@ import type { Item, ItemType } from '../types';
 import { ApiClientError, apiRequest, getApiBaseUrl, type ApiRequestOptions } from './apiClient';
 import { loadAuthSession } from './authSession';
 import { isTimestamp } from './dateTime';
+import { validItemCoordinates } from './itemCoordinates';
 
 /**
  * Community items registered through LOST QUEST live in Spring Boot + MySQL. Police items come from their public-data API. Server items get route ids like `api-lost-12` so lost/found ids never collide
@@ -27,6 +28,8 @@ export interface CreateItemInput {
   date: string;
   region: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   ownershipQuestion?: string;
   ownershipAnswer?: string;
 }
@@ -79,6 +82,7 @@ export function fromServerItem(type: ItemType, value: unknown, baseUrl = getApiB
     // Rows created before the region column existed have no region; they show the location only.
     region: isText(raw.region) ? raw.region : '',
     location: raw.location,
+    ...(validItemCoordinates(raw.latitude, raw.longitude) ? { latitude: raw.latitude as number, longitude: raw.longitude as number } : {}),
     description: isText(raw.description) ? raw.description : '',
     // Rows without an uploaded image (imageUrl NULL) keep the category illustration.
     image: resolveServerImageUrl(raw.imageUrl, baseUrl) ?? defaultItemImage(raw.category, raw.title),
@@ -145,6 +149,10 @@ export function describeMyItemsError(error: unknown): string {
  * multipart "item" part next to the "image" file; without one, the original JSON request is used.
  */
 function itemBody(type: ItemType, input: CreateItemInput) {
+  const hasCoordinates = input.latitude !== undefined || input.longitude !== undefined;
+  if (hasCoordinates && !validItemCoordinates(input.latitude, input.longitude)) {
+    throw new ApiClientError('INVALID_RESPONSE', '지도 위치를 다시 선택해 주세요. 위도와 경도가 올바르지 않아요.');
+  }
   return {
     title: input.title.trim(),
     category: input.category,
@@ -153,6 +161,7 @@ function itemBody(type: ItemType, input: CreateItemInput) {
     [type === 'lost' ? 'lostDate' : 'foundDate']: input.date,
     region: input.region,
     location: input.location.trim(),
+    ...(hasCoordinates ? { latitude: input.latitude, longitude: input.longitude } : {}),
     ...(type === 'found' && input.ownershipQuestion ? {
       ownershipQuestion: input.ownershipQuestion.trim(), ownershipAnswer: input.ownershipAnswer?.trim(),
     } : {}),

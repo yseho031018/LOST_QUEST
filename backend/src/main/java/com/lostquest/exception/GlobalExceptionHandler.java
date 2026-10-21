@@ -30,6 +30,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(429).header("Retry-After", "60")
             .body(ApiError.of(429, "RATE_LIMITED", ex.getMessage(), request.getRequestURI()));
     }
+    @Override
+    protected ResponseEntity<Object> handleErrorResponseException(org.springframework.web.ErrorResponseException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (ex instanceof org.springframework.web.server.ResponseStatusException response && ((ServletWebRequest) request).getRequest().getRequestURI().equals("/api/places/search")) {
+            String code = status.value() == 429 ? "RATE_LIMITED" : status.value() == 503 ? "PLACE_SEARCH_UNAVAILABLE" : "INVALID_REQUEST";
+            HttpHeaders safeHeaders = new HttpHeaders();
+            if (status.value() == 429) safeHeaders.set("Retry-After", "2");
+            return new ResponseEntity<>(ApiError.of(status.value(), code, response.getReason(),
+                    ((ServletWebRequest) request).getRequest().getRequestURI()), safeHeaders, status);
+        }
+        return super.handleErrorResponseException(ex, headers, status, request);
+    }
+
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(WorkflowConflictException.class)

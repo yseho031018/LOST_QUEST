@@ -12,6 +12,8 @@ export interface Item {
   createdAt?: string;
   region: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   description: string;
   image: string;
   source: ItemSource;

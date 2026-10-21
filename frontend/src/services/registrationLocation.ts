@@ -22,6 +22,8 @@ const regionAliases: Record<string, string> = {
 
 const knownRegion = (name: string) => Object.hasOwn(regionAliases, name) ? regionAliases[name] : undefined;
 
+export const normalizeRegistrationRegion = (name: string): string | undefined => knownRegion(name.trim());
+
 export function hasRegistrationLocationMismatch(region: string, location: string): boolean {
   const selected = knownRegion(region);
   const tokens = location.trim().split(/\s+/);

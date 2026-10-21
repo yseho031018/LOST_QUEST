@@ -64,6 +64,19 @@ public class LostItem extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String location;
 
+    private Double latitude;
+    private Double longitude;
+
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
+    public void setCoordinates(Double latitude, Double longitude) {
+        if (!com.lostquest.validation.ItemCoordinates.valid(latitude, longitude)) {
+            throw new IllegalArgumentException("Invalid coordinate pair");
+        }
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
     @Size(max = 2048)
     @Column(name = "image_url", length = 2048)
     private String imageUrl;
@@ -79,6 +92,9 @@ public class LostItem extends BaseEntity {
 
     public void revise(String title, String category, String color, String description,
                        LocalDate lostDate, String region, String location, String imageUrl) {
+        if (!java.util.Objects.equals(this.location, location) || !java.util.Objects.equals(this.region, region)) {
+            setCoordinates(null, null);
+        }
         this.title = title;
         this.category = category;
         this.color = color;

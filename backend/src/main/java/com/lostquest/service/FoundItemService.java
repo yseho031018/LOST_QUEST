@@ -77,6 +77,9 @@ public class FoundItemService {
     @Transactional
     public FoundItemResponse create(String authenticatedSubject, CreateFoundItemRequest request, MultipartFile image) {
         User author = currentUserReader.require(authenticatedSubject);
+        if (!com.lostquest.validation.ItemCoordinates.valid(request.latitude(), request.longitude())) {
+            throw new InvalidRequestParameterException("coordinates", "위도와 경도를 함께 올바른 범위로 입력해 주세요.");
+        }
         CommunityTextRules.publicText(request.title(), request.color(), request.description(), request.location());
         writeLimiter.check(author.getId(), "post", 10);
         boolean hasQuestion = request.ownershipQuestion() != null && !request.ownershipQuestion().isBlank();
@@ -87,6 +90,7 @@ public class FoundItemService {
         FoundItem item = new FoundItem(author, request.title().trim(),
                 request.category(), request.color().trim(), request.description().trim(), request.foundDate(),
                 request.region(), request.location().trim(), imageUrl, FoundItemStatus.STORED);
+        item.setCoordinates(request.latitude(), request.longitude());
         FoundItem saved = foundItemRepository.saveAndFlush(item);
         if (hasAnswer) saved.configureOwnership(request.ownershipQuestion().trim(), ownershipProof.encode(request.ownershipAnswer()));
         activityService.registered(author, "found", saved.getId(), saved.getTitle());

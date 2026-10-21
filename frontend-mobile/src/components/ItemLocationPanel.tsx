@@ -2,6 +2,7 @@ import { Component, Suspense, lazy, useState, type ReactNode } from 'react';
 import { ExternalLink, MapPin } from 'lucide-react';
 import { findApprovedPlace, kakaoMapSearchUrl } from '../data/approvedPlaces';
 import type { Item } from '../types';
+import { validItemCoordinates } from '../services/itemCoordinates';
 import './ItemLocationPanel.css';
 
 const LeafletMap = lazy(() => import('./LeafletMap'));
@@ -15,9 +16,10 @@ class MapErrorBoundary extends Component<{ onError: () => void; children: ReactN
 }
 
 /** The location tab: the stored place text always, a map only for reviewed positions, otherwise a Kakao Map search link. */
-export default function ItemLocationPanel({ item }: { item: Pick<Item, 'id' | 'type' | 'source' | 'region' | 'location'> }) {
+export default function ItemLocationPanel({ item }: { item: Pick<Item, 'id' | 'type' | 'source' | 'region' | 'location' | 'latitude' | 'longitude'> }) {
   const placeText = (item.location.startsWith(item.region) ? item.location : [item.region, item.location].join(' ')).trim();
-  const place = findApprovedPlace(item);
+  const savedPosition = item.source === 'community' && validItemCoordinates(item.latitude, item.longitude);
+  const place = savedPosition ? { lat: item.latitude!, lng: item.longitude!, label: placeText } : findApprovedPlace(item);
   const [mapFailed, setMapFailed] = useState(false);
 
   return <div className="detail-location">
@@ -27,7 +29,7 @@ export default function ItemLocationPanel({ item }: { item: Pick<Item, 'id' | 't
           <LeafletMap place={place} onFail={() => setMapFailed(true)} />
         </Suspense>
       </MapErrorBoundary>
-      <figcaption>등록된 장소를 기준으로 한 대략적인 위치입니다. 지도 표시 기준: {place.label}</figcaption>
+      <figcaption>{savedPosition ? '등록자가 지도에서 선택한 위치입니다. 실제 장소와 차이가 있을 수 있어요.' : `등록된 장소를 기준으로 한 대략적인 위치입니다. 지도 표시 기준: ${place.label}`}</figcaption>
     </figure>}
     <div className="detail-location-text">
       <MapPin size={20} aria-hidden="true" />

@@ -75,12 +75,16 @@ public class LostItemService {
     @Transactional
     public LostItemResponse create(String authenticatedSubject, CreateLostItemRequest request, MultipartFile image) {
         User author = currentUserReader.require(authenticatedSubject);
+        if (!com.lostquest.validation.ItemCoordinates.valid(request.latitude(), request.longitude())) {
+            throw new InvalidRequestParameterException("coordinates", "위도와 경도를 함께 올바른 범위로 입력해 주세요.");
+        }
         CommunityTextRules.publicText(request.title(), request.color(), request.description(), request.location());
         writeLimiter.check(author.getId(), "post", 10);
         String imageUrl = isPresent(image) ? imageService.storeForNewItem(image) : null;
         LostItem item = new LostItem(author, request.title().trim(),
                 request.category(), request.color().trim(), request.description().trim(), request.lostDate(),
                 request.region(), request.location().trim(), imageUrl, LostItemStatus.LOST);
+        item.setCoordinates(request.latitude(), request.longitude());
         LostItem saved = lostItemRepository.saveAndFlush(item);
         activityService.registered(author, "lost", saved.getId(), saved.getTitle());
         return LostItemResponse.from(saved);

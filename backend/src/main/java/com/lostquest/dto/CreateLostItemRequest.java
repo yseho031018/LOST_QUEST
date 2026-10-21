@@ -19,6 +19,17 @@ public record CreateLostItemRequest(
         @NotBlank @Size(min = ItemFieldRules.DESCRIPTION_MIN, max = ItemFieldRules.DESCRIPTION_MAX) String description,
         @NotNull @PastOrPresent LocalDate lostDate,
         @NotBlank @Pattern(regexp = ItemFieldRules.REGION_PATTERN, message = ItemFieldRules.REGION_MESSAGE) String region,
-        @NotBlank @Size(max = ItemFieldRules.LOCATION_MAX) String location
+        @NotBlank @Size(max = ItemFieldRules.LOCATION_MAX) String location,
+        Double latitude,
+        Double longitude
 ) {
+    public CreateLostItemRequest(String title, String category, String color, String description, LocalDate lostDate, String region, String location) {
+        this(title, category, color, description, lostDate, region, location, null, null);
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @jakarta.validation.constraints.AssertTrue(message = "위도와 경도를 함께 올바른 범위로 입력해 주세요.")
+    public boolean isCoordinatesValid() {
+        return com.lostquest.validation.ItemCoordinates.valid(latitude, longitude);
+    }
 }

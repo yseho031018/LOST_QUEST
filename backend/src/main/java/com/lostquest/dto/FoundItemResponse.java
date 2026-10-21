@@ -21,7 +21,9 @@ public record FoundItemResponse(
         Instant createdAt,
         String ownershipQuestion,
         boolean ownershipConfigured,
-        boolean hidden
+        boolean hidden,
+        Double latitude,
+        Double longitude
 ) {
     public static FoundItemResponse from(FoundItem item) {
         return view(item, false);
@@ -36,6 +38,6 @@ public record FoundItemResponse(
         return new FoundItemResponse(item.getId(), item.getUser().getId(), item.getTitle(),
                 item.getCategory(), item.getColor(), item.getDescription(), item.getFoundDate(),
                 item.getRegion(), item.getLocation(), item.getImageUrl(), item.getStatus(), item.getCreatedAt(),
-                includeQuestion ? item.getOwnershipQuestion() : null, item.isOwnershipConfigured(), item.isHidden());
+                includeQuestion ? item.getOwnershipQuestion() : null, item.isOwnershipConfigured(), item.isHidden(), item.getLatitude(), item.getLongitude());
     }
 }
