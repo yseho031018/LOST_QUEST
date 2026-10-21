@@ -15,7 +15,7 @@ describe('profile settings API', () => {
   it('sends a trimmed nickname with the session token and whitelists the returned user', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ...USER, password: '$2a$10$hash' }));
     vi.stubGlobal('fetch', fetchMock);
-    expect(await updateNickname('  새이름  ', BASE)).toEqual({ id: 1, email: USER.email, nickname: '새이름', role: 'USER' });
+    expect(await updateNickname('  새이름  ', BASE)).toEqual({ id: 1, email: USER.email, nickname: '새이름', role: 'USER', hasPassword: true });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('http://localhost:8080/api/auth/me/nickname');
     expect(init).toMatchObject({ method: 'PUT', body: JSON.stringify({ nickname: '새이름' }) });

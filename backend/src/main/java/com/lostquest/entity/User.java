@@ -25,9 +25,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 254)
     private String email;
 
-    @NotBlank
+    /** Null for accounts created through social login, which have no password to sign in with. */
     @Pattern(regexp = BCRYPT_PATTERN, message = "비밀번호는 BCrypt 해시로 저장해야 합니다.")
-    @Column(nullable = false, length = 60)
+    @Column(length = 60)
     private String password;
 
     @NotBlank
@@ -54,6 +54,15 @@ public class User extends BaseEntity {
         this.role = role;
     }
 
+    /** A social-login account without a password; it signs in only through its linked provider. */
+    public static User withoutPassword(String email, String nickname, UserRole role) {
+        User user = new User();
+        user.email = email;
+        user.nickname = nickname;
+        user.role = role;
+        return user;
+    }
+
     @JsonIgnore
     public String getEmail() {
         return email;
@@ -62,6 +71,11 @@ public class User extends BaseEntity {
     @JsonIgnore
     public String getPassword() {
         return password;
+    }
+
+    @JsonIgnore
+    public boolean hasPassword() {
+        return password != null;
     }
 
     public String getNickname() {

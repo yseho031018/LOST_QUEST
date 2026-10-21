@@ -12,7 +12,7 @@ vi.mock('../context/AppContext', () => ({ useApp: () => app.value }));
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
-  app.value = { authUser: { id: 1, email: 'hunter@lostquest.test', nickname: '처음이름', role: 'USER' }, updateNickname: vi.fn().mockResolvedValue(undefined), changePassword: vi.fn().mockResolvedValue(undefined) };
+  app.value = { authUser: { id: 1, email: 'hunter@lostquest.test', nickname: '처음이름', role: 'USER', hasPassword: true }, updateNickname: vi.fn().mockResolvedValue(undefined), changePassword: vi.fn().mockResolvedValue(undefined) };
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   act(() => root.render(<ProfileSettings />));
 });
@@ -51,5 +51,13 @@ describe('ProfileSettings', () => {
     expect(app.value.changePassword).toHaveBeenLastCalledWith('Quest1234!', 'NewQuest5678!');
     expect(text(1)).toContain('비밀번호를 바꿨어요');
     expect(container.querySelector<HTMLInputElement>('#profile-current-password')!.value).toBe('');
+  });
+  it('shows a Google account how it signs in instead of a password form it cannot use', async () => {
+    app.value = { ...app.value, authUser: { id: 1, email: 'hunter@gmail.com', nickname: '구글회원', role: 'USER', hasPassword: false } };
+    act(() => root.render(<ProfileSettings />));
+    expect(container.querySelectorAll('form')).toHaveLength(1);
+    expect(container.querySelector('#profile-current-password')).toBeNull();
+    expect(container.textContent).toContain('구글 계정으로 로그인하는 계정이라 비밀번호가 없어요');
+    expect(container.textContent).toContain('hunter@gmail.com');
   });
 });

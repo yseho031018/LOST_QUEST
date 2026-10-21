@@ -10,6 +10,11 @@ app:
     # [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
     secret: YOUR_LOCAL_RANDOM_JWT_SECRET
     # access-token-expiration: 1h
+  # 구글 로그인(선택). Google Cloud Console의 OAuth 웹 클라이언트 ID이며 frontend의 VITE_GOOGLE_CLIENT_ID와 같아야 합니다.
+  # 공개 값이고 클라이언트 보안 비밀(secret)은 필요 없습니다. 주석을 해제하지 않으면 구글 로그인만 꺼집니다.
+  # social-login:
+  #   google:
+  #     client-id: YOUR_GOOGLE_OAUTH_WEB_CLIENT_ID.apps.googleusercontent.com
   police-api:
     # 공공데이터포털에서 발급받은 각 서비스의 인증키 (Encoding/Decoding 어느 쪽이든 가능). 공유·커밋 금지.
     lost:

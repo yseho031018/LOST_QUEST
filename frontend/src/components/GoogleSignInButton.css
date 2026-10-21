@@ -1,0 +1,6 @@
+.google-signin { display:flex; flex-direction:column; gap:12px; margin-top:22px; }
+.google-signin-divider { display:flex; align-items:center; gap:12px; color:#8b97a2; font-size:0.875rem; }
+.google-signin-divider::before,.google-signin-divider::after { content:""; flex:1; height:1px; background:#e4ebef; }
+.google-signin-slot { display:flex; justify-content:center; min-height:44px; }
+.google-signin-slot.is-disabled { pointer-events:none; opacity:.55; }
+.google-signin-note { margin:0; font-size:0.8125rem; line-height:1.7; text-align:center; }

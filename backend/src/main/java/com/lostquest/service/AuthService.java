@@ -50,7 +50,8 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request) {
-        Optional<User> user = userRepository.findByEmail(normalizeEmail(request.email()));
+        // Social-login accounts have no password and are rejected like an unknown email.
+        Optional<User> user = userRepository.findByEmail(normalizeEmail(request.email())).filter(User::hasPassword);
         String hash = user.map(User::getPassword).orElse(dummyPasswordHash);
         boolean matches = passwordEncoder.matches(request.password(), hash);
         if (user.isEmpty() || !matches) {
@@ -76,6 +77,9 @@ public class AuthService {
     @Transactional
     public void changePassword(String subject, ChangePasswordRequest request) {
         User user = requireUser(subject);
+        if (!user.hasPassword()) {
+            throw new InvalidRequestParameterException("currentPassword", "소셜 로그인 계정은 비밀번호가 없어 변경할 수 없습니다.");
+        }
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new InvalidRequestParameterException("currentPassword", "현재 비밀번호가 올바르지 않습니다.");
         }

@@ -2,11 +2,14 @@ package com.lostquest.controller;
 
 import com.lostquest.dto.AuthUserResponse;
 import com.lostquest.dto.ChangePasswordRequest;
+import com.lostquest.dto.GoogleLoginRequest;
 import com.lostquest.dto.LoginRequest;
 import com.lostquest.dto.LoginResponse;
 import com.lostquest.dto.SignupRequest;
+import com.lostquest.dto.SocialLoginResponse;
 import com.lostquest.dto.UpdateNicknameRequest;
 import com.lostquest.service.AuthService;
+import com.lostquest.service.SocialLoginService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final SocialLoginService socialLoginService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, SocialLoginService socialLoginService) {
         this.authService = authService;
+        this.socialLoginService = socialLoginService;
     }
 
     @PostMapping("/signup")
@@ -38,6 +43,12 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    /** Signs in, or signs up, with a Google ID token. A first sign-in without a verified email answers EMAIL_REQUIRED. */
+    @PostMapping("/social/google")
+    public SocialLoginResponse googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        return socialLoginService.loginWithGoogle(request);
     }
 
     @GetMapping("/me")

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from './apiClient';
-import { describeAuthError, fetchCurrentUser, login, restoreAuthSession, signup } from './authApi';
+import { describeAuthError, fetchCurrentUser, googleLogin, login, restoreAuthSession, signup } from './authApi';
 
 const BASE = { baseUrl: 'http://localhost:8080' };
 const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl';
@@ -22,7 +22,7 @@ describe('auth API', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ...USER, password: '$2a$10$hash' }, 201));
     vi.stubGlobal('fetch', fetchMock);
     const user = await signup({ email: ' hunter@lostquest.test ', password: ' pass word ', nickname: ' 로스트헌터 ' }, BASE);
-    expect(user).toEqual({ id: 1, email: 'hunter@lostquest.test', nickname: '로스트헌터', role: 'USER' });
+    expect(user).toEqual({ id: 1, email: 'hunter@lostquest.test', nickname: '로스트헌터', role: 'USER', hasPassword: true });
     const init = (fetchMock.mock.calls[0] as [string, RequestInit])[1];
     expect(JSON.parse(String(init.body))).toEqual({ email: 'hunter@lostquest.test', password: ' pass word ', nickname: '로스트헌터' });
   });
@@ -30,7 +30,7 @@ describe('auth API', () => {
   it('logs in and returns the Bearer token with the user', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ accessToken: TOKEN, tokenType: 'Bearer', expiresIn: 3600, user: USER })));
     await expect(login('hunter@lostquest.test', 'Quest1234!', BASE)).resolves.toEqual({
-      accessToken: TOKEN, expiresIn: 3600, user: { id: 1, email: USER.email, nickname: USER.nickname, role: 'USER' },
+      accessToken: TOKEN, expiresIn: 3600, user: { id: 1, email: USER.email, nickname: USER.nickname, role: 'USER', hasPassword: true },
     });
   });
 
@@ -58,6 +58,43 @@ describe('auth API', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://localhost:8080/api/auth/me');
     expect(init.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}` });
+  });
+
+  it('signs in with a Google credential and keeps that the account has no password', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 'SIGNED_IN', accessToken: TOKEN, tokenType: 'Bearer', expiresIn: 3600, user: { ...USER, hasPassword: false } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(googleLogin('google-id-token', undefined, BASE)).resolves.toEqual({
+      status: 'SIGNED_IN', login: { accessToken: TOKEN, expiresIn: 3600, user: { id: 1, email: USER.email, nickname: USER.nickname, role: 'USER', hasPassword: false } },
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:8080/api/auth/social/google');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ credential: 'google-id-token' });
+  });
+
+  it('reports EMAIL_REQUIRED and resends the same credential with a trimmed email', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ status: 'EMAIL_REQUIRED' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'SIGNED_IN', accessToken: TOKEN, tokenType: 'Bearer', expiresIn: 3600, user: { ...USER, hasPassword: false } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(googleLogin('google-id-token', undefined, BASE)).resolves.toEqual({ status: 'EMAIL_REQUIRED' });
+    await expect(googleLogin('google-id-token', '  hunter@lostquest.test ', BASE)).resolves.toMatchObject({ status: 'SIGNED_IN' });
+    expect(JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body))).toEqual({ credential: 'google-id-token', email: 'hunter@lostquest.test' });
+  });
+
+  it('blocks a malformed entered email before sending the Google credential', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(googleLogin('google-id-token', 'da@ee', BASE)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { status: 'SIGNED_IN', accessToken: TOKEN, tokenType: 'Bearer', expiresIn: 3600 },
+    { status: 'UNKNOWN', accessToken: TOKEN, tokenType: 'Bearer', expiresIn: 3600, user: USER },
+  ])('rejects an unexpected Google sign-in response %#', async (body) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(body)));
+    await expect(googleLogin('google-id-token', undefined, BASE)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
   it('formats validation field errors for the form', () => {

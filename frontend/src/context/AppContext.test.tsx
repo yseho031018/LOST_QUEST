@@ -5,12 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppProvider, useApp } from './AppContext';
 import type { AuthUser } from '../services/authApi';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT=true;
-const mocks=vi.hoisted(()=>({restore:vi.fn(),login:vi.fn(),activity:vi.fn(),items:vi.fn(),mark:vi.fn(),action:vi.fn()}));
-vi.mock('../services/authApi',()=>({restoreAuthSession:mocks.restore,login:mocks.login,signup:vi.fn()}));
+const mocks=vi.hoisted(()=>({restore:vi.fn(),login:vi.fn(),google:vi.fn(),activity:vi.fn(),items:vi.fn(),mark:vi.fn(),action:vi.fn()}));
+vi.mock('../services/authApi',()=>({restoreAuthSession:mocks.restore,login:mocks.login,googleLogin:mocks.google,signup:vi.fn()}));
 vi.mock('../services/activityApi',()=>({loadActivity:mocks.activity,markActivityRead:mocks.mark,returnAction:mocks.action,createReturn:vi.fn(),describeActivityError:()=> '서버 기록을 불러오지 못했어요.'}));
 vi.mock('../services/itemApi',()=>({listAllServerItems:mocks.items}));
-const a:AuthUser={id:1,email:'a@example.com',nickname:'A',role:'USER'};
-const b:AuthUser={id:2,email:'b@example.com',nickname:'B',role:'USER'};
+const a:AuthUser={id:1,email:'a@example.com',nickname:'A',role:'USER',hasPassword:true};
+const b:AuthUser={id:2,email:'b@example.com',nickname:'B',role:'USER',hasPassword:true};
 const snapshot=(name:string,xp:number)=>({profile:{name,xp,registeredCount:0,returnedCount:0},requests:[],relatedItems:[],notifications:[{id:name,title:name+' 개인알림',message:'비공개',read:false,createdAt:'2026-10-01T00:00:00Z'}]});
 let current:ReturnType<typeof useApp>; let container:HTMLDivElement; let root:Root;
 function Probe(){current=useApp();return <div>{current.profile.name}:{current.profile.xp}:{current.notifications.map(n=>n.title).join(',')}</div>;}
@@ -44,4 +44,21 @@ it('does not fabricate a successful update when the server fails',async()=>{
   mocks.action.mockRejectedValue(new Error('database down'));
   await expect(current.completeReturn('4')).rejects.toThrow('database down');
   expect(container.textContent).toBe('A:60:A 개인알림');
+});
+it('starts a session from Google only once the server signs the user in',async()=>{
+  await act(async()=>{current.logout();});await settle();
+  mocks.google.mockResolvedValueOnce({status:'EMAIL_REQUIRED'})
+    .mockResolvedValueOnce({status:'SIGNED_IN',login:{user:{...b,hasPassword:false},accessToken:'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIn0.c2ln',expiresIn:3600}});
+  mocks.activity.mockResolvedValue(snapshot('B',10));
+  let status:string|undefined;
+  await act(async()=>{status=await current.loginWithGoogle('google-id-token');});await settle();
+  expect(status).toBe('EMAIL_REQUIRED');
+  expect(current.isLoggedIn).toBe(false);
+  expect(sessionStorage.length).toBe(0);
+  await act(async()=>{status=await current.loginWithGoogle('google-id-token','b@example.com');});await settle();
+  expect(status).toBe('SIGNED_IN');
+  expect(mocks.google).toHaveBeenLastCalledWith('google-id-token','b@example.com');
+  expect(current.authUser).toMatchObject({id:2,hasPassword:false});
+  expect(container.textContent).toBe('B:10:B 개인알림');
+  expect(sessionStorage.length).toBe(1);
 });
