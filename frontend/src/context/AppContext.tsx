@@ -17,7 +17,10 @@ interface AppContextValue extends AppData {
   logout: () => void;
   updateNickname: (nickname: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  refreshData: () => Promise<void>;
+  /** silent: a background re-read that keeps the screens' loading messages hidden. */
+  refreshData: (options?: { silent?: boolean }) => Promise<void>;
+  /** The latest XP increase of the signed-in user, compared with that account's previous load. */
+  xpGain: { amount: number; key: number } | null;
   createRequest: (itemId: string, lostItemId?: string) => Promise<ReturnRequest>;
   verifyOwner: (id: string, answer: string) => Promise<boolean>;
   approveRequest: (id: string) => Promise<void>;
@@ -30,6 +33,9 @@ interface AppContextValue extends AppData {
 }
 const emptyData = (): AppData => ({ items: [], requests: [], notifications: [], profile: { name: '방문자', xp: 0, registeredCount: 0, returnedCount: 0 } });
 const AppContext = createContext<AppContextValue | null>(null);
+/** While a return is in progress, both sides re-read it this often so the other party's step shows up by itself. */
+const LIVE_REFRESH_MS = 5_000;
+const LIVE_RETURN_STATUSES = new Set<ReturnRequest['status']>(['pending', 'owner_verified', 'approved', 'qr_verified']);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState(emptyData);
@@ -41,6 +47,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<AuthUser | null>(null);
   const authVersion = useRef(0);
   const loadVersion = useRef(0);
+  const lastXp = useRef<{ userId: number; xp: number } | null>(null);
+  const livePolling = useRef(false);
+  const [xpGain, setXpGain] = useState<{ amount: number; key: number } | null>(null);
 
   const applySession = useCallback((user: AuthUser | null, expiresAt: number | null) => {
     userRef.current = user;
@@ -60,13 +69,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [applySession]);
 
-  const refreshData = useCallback(async () => {
+  const refreshData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     const version = ++loadVersion.current;
     const user = userRef.current;
-    setActivityLoading(user !== null);
+    if (!silent) setActivityLoading(user !== null);
     // Public items and private activity fail independently; no fabricated/local-data fallback.
     const [items, activity] = await Promise.allSettled([listAllServerItems(), user ? loadActivity() : Promise.resolve(null)]);
     if (version !== loadVersion.current || user?.id !== userRef.current?.id) return;
+    if (user && activity.status === 'fulfilled' && activity.value) {
+      // Only a rise for the same account counts; the first load after sign-in just sets the baseline.
+      const xp = activity.value.profile.xp, previous = lastXp.current;
+      if (previous && previous.userId === user.id && xp > previous.xp) setXpGain({ amount: xp - previous.xp, key: Date.now() });
+      lastXp.current = { userId: user.id, xp };
+    }
     setData(previous => {
       const publicItems = items.status === 'fulfilled' ? items.value : previous.items;
       const privateData = activity.status === 'fulfilled' ? activity.value : null;
@@ -100,6 +115,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       Math.min(Math.max(authExpiresAt - Date.now(), 0), 2_147_483_647));
     return () => clearTimeout(timer);
   }, [authExpiresAt, applySession]);
+
+  const returnInProgress = authUser !== null && data.requests.some(request => LIVE_RETURN_STATUSES.has(request.status));
+  useEffect(() => {
+    if (!returnInProgress) return;
+    const timer = setInterval(() => {
+      // Visible tab only, and never more than one background read at a time on a slow connection.
+      if (document.visibilityState !== 'visible' || livePolling.current) return;
+      livePolling.current = true;
+      void refreshData({ silent: true }).finally(() => { livePolling.current = false; });
+    }, LIVE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [returnInProgress, refreshData]);
 
   const startSession = (version: number, result: LoginResult) => {
     if (version !== authVersion.current) return;
@@ -141,7 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
   return <AppContext.Provider value={{
     ...data, isLoggedIn: authUser !== null, authUser, authChecking, activityLoading, login, loginWithGoogle, signup, logout, updateNickname, changePassword,
-    refreshData, createRequest, storageError,
+    refreshData, createRequest, storageError, xpGain,
     verifyOwner: async (id, answer) => { await act(id, 'verify-owner', { answer }); return true; },
     approveRequest: id => act(id, 'approve'),
     verifyQr: (id, token) => act(id, 'verify-qr', { token }),

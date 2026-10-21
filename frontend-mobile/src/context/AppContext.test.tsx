@@ -62,3 +62,48 @@ it('starts a session from Google only once the server signs the user in',async()
   expect(container.textContent).toBe('B:10:B 개인알림');
   expect(sessionStorage.length).toBe(1);
 });
+it('reports an XP rise for the same account only, without counting the first load or another account',async()=>{
+  expect(current.xpGain).toBeNull();
+  mocks.activity.mockResolvedValue(snapshot('A',110));
+  await act(async()=>{await current.refreshData();});await settle();
+  expect(current.xpGain).toMatchObject({amount:50});
+  const firstKey=current.xpGain!.key;
+  await act(async()=>{await current.refreshData();});await settle();
+  expect(current.xpGain!.key).toBe(firstKey);
+  mocks.activity.mockResolvedValue(snapshot('B',500));
+  await act(async()=>{current.logout();});await settle();
+  await act(async()=>{await current.login('b@example.com','Quest1234!');});await settle();
+  expect(current.xpGain!.key).toBe(firstKey);
+});
+it('keeps the loading flag off for a silent background refresh',async()=>{
+  let release!:(value:ReturnType<typeof snapshot>)=>void;
+  mocks.activity.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;}));
+  let pending!:Promise<void>;
+  await act(async()=>{pending=current.refreshData({silent:true});});
+  expect(current.activityLoading).toBe(false);
+  await act(async()=>{release(snapshot('A',60));await pending;});
+});
+it('re-reads quietly every 5 seconds only while a return is in progress and the page is visible',async()=>{
+  act(()=>root.unmount());
+  const inProgress=(status:string)=>({...snapshot('A',60),requests:[{id:'1',itemId:'api-found-57',status}]});
+  vi.useFakeTimers({toFake:['setInterval','clearInterval']});
+  try{
+    mocks.activity.mockResolvedValue(inProgress('approved'));
+    root=createRoot(container);
+    await act(async()=>{root.render(<AppProvider><Probe/></AppProvider>);});await settle();
+    const calls=()=>mocks.activity.mock.calls.length;
+    const before=calls();
+    await act(async()=>{vi.advanceTimersByTime(5000);});await settle();
+    expect(calls()).toBe(before+1);
+    expect(current.activityLoading).toBe(false);
+    const hidden=vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');
+    await act(async()=>{vi.advanceTimersByTime(5000);});await settle();
+    expect(calls()).toBe(before+1);
+    hidden.mockRestore();
+    mocks.activity.mockResolvedValue(inProgress('completed'));
+    await act(async()=>{vi.advanceTimersByTime(5000);});await settle();
+    expect(calls()).toBe(before+2);
+    await act(async()=>{vi.advanceTimersByTime(15000);});await settle();
+    expect(calls()).toBe(before+2);
+  }finally{vi.useRealTimers();}
+});
