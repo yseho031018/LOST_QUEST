@@ -180,3 +180,55 @@ describe('public GET connectivity and fallback', () => {
     expect(restored.items.map(entry => entry.id)).toEqual([first.id]);
   });
 });
+
+describe('경찰청 분실물 keyword failure behind a tunnel', () => {
+  const healthy = () => new Response(JSON.stringify({ status: 'OK', service: 'LOST QUEST API' }), { headers: { 'Content-Type': 'application/json' } });
+  /** Police requests fail like a CORS-blocked Cloudflare 502 page; /api/health answers with `health()`. */
+  function stubFetch(health: (signal?: AbortSignal | null) => Promise<Response>) {
+    const calls = { health: 0, police: 0 };
+    vi.stubGlobal('fetch', vi.fn((url: string | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/api/health')) { calls.health++; return health(init?.signal); }
+      calls.police++; return Promise.reject(new TypeError('Failed to fetch'));
+    }));
+    return calls;
+  }
+
+  it('marks the backend reachable when /api/health answers, with one shared check for concurrent failures', async () => {
+    const calls = stubFetch(() => new Promise(resolve => setTimeout(() => resolve(healthy()), 50)));
+    const [a, b] = await Promise.all([loadPolicePublicList('lost', { q: '지갑' }), loadPolicePublicList('lost', { q: '지갑' })]);
+    expect(a).toMatchObject({ status: 'error', dataStatus: 'unavailable', backendReachable: true });
+    expect(b).toMatchObject({ backendReachable: true });
+    expect(calls.health).toBe(1);
+  });
+
+  it('keeps the outage state when /api/health fails, and does not retry', async () => {
+    const calls = stubFetch(async () => new Response('<html>502</html>', { status: 502 }));
+    const state = await loadPolicePublicList('lost', { q: '지갑' });
+    expect(state).toMatchObject({ status: 'error', dataStatus: 'unavailable' });
+    expect(state.backendReachable).toBeUndefined();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(calls.health).toBe(1);
+  });
+
+  it('gives up on a /api/health that does not answer within its timeout', async () => {
+    const calls = stubFetch(signal => new Promise((_, reject) => signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))));
+    const started = Date.now();
+    const state = await loadPolicePublicList('lost', { q: '지갑' });
+    expect(state.backendReachable).toBeUndefined();
+    expect(Date.now() - started).toBeLessThan(6_000);
+    expect(calls.health).toBe(1);
+  }, 10_000);
+
+  it('does not check health for 습득물, a lost listing without a keyword, a later page or a server error code', async () => {
+    const calls = stubFetch(async () => healthy());
+    expect((await loadPolicePublicList('found', { q: '지갑' })).backendReachable).toBeUndefined();
+    expect((await loadPolicePublicList('lost', {})).backendReachable).toBeUndefined();
+    expect((await loadPolicePublicList('lost', { q: '지갑', page: 2 })).backendReachable).toBeUndefined();
+    expect(calls.health).toBe(0);
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => String(url).endsWith('/api/health') ? healthy()
+      : new Response(JSON.stringify({ status: 502, code: 'EXTERNAL_API_ERROR', message: '경찰청 공공데이터 서버가 요청을 처리하지 못했습니다.' }), { status: 502, headers: { 'Content-Type': 'application/json' } })));
+    const coded = await loadPolicePublicList('lost', { q: '우산' });
+    expect(coded).toMatchObject({ status: 'error', errorCode: 'EXTERNAL_API_ERROR' });
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/api/health'))).toHaveLength(0);
+  });
+});
