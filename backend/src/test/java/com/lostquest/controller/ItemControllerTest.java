@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -69,6 +70,9 @@ class ItemControllerTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private Clock itemDateClock;
 
     private User author;
     private User otherUser;
@@ -232,20 +236,22 @@ class ItemControllerTest {
     @Test
     @DisplayName("미래 날짜는 400, 오늘 날짜는 허용")
     void createRejectsFutureDate() throws Exception {
+        // The site's Korean calendar, not the JVM's: they disagree from 00:00 to 09:00 KST on a UTC machine.
+        LocalDate today = LocalDate.now(itemDateClock);
         Map<String, Object> lost = lostBody();
-        lost.put("lostDate", LocalDate.now().plusDays(1).toString());
+        lost.put("lostDate", today.plusDays(1).toString());
         postItem("/api/lost-items", lost, token)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.errors[*].field", hasItem("lostDate")));
 
         Map<String, Object> found = foundBody();
-        found.put("foundDate", LocalDate.now().plusYears(1).toString());
+        found.put("foundDate", today.plusYears(1).toString());
         postItem("/api/found-items", found, token)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[*].field", hasItem("foundDate")));
 
-        found.put("foundDate", LocalDate.now().toString());
+        found.put("foundDate", today.toString());
         postItem("/api/found-items", found, token).andExpect(status().isCreated());
         assertThat(lostItemRepository.count()).isZero();
     }
