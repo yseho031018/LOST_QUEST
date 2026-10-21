@@ -43,4 +43,28 @@ describe('local text reference lifecycle',()=>{
   const promise=compareMatchTexts(data(),new AbortController().signal);FakeWorker.all[0].onmessage!({data:{type:'result',vectors:[[1],[2],[3]]}});
   await expect(promise).rejects.toThrow();
  });
+ it('shows download guidance while retaining the detailed model failure only in diagnostics',async()=>{
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try{
+   const promise=compareMatchTexts(data(),new AbortController().signal);
+   FakeWorker.all[0].onmessage!({data:{type:'error',message:'Unexpected token < diagnostic'}});
+   await expect(promise).rejects.toThrow('인터넷 연결');expect(log).toHaveBeenCalledWith('[AI text analysis]','Unexpected token < diagnostic');
+  }finally{log.mockRestore();}
+ });
+ it('distinguishes failed cache recovery from a network failure',async()=>{
+  const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+  try{
+   const promise=compareMatchTexts(data(),new AbortController().signal);
+   FakeWorker.all[0].onmessage!({data:{type:'error',code:'MODEL_CACHE_RECOVERY_FAILED',message:'Cache storage denied'}});
+   await expect(promise).rejects.toThrow('캐시를 복구');expect(FakeWorker.all[0].terminate).toHaveBeenCalledTimes(1);
+  }finally{log.mockRestore();}
+ });
+ it('terminates the worker after the unchanged 180 second limit',async()=>{
+  vi.useFakeTimers();
+  try{
+   const result=compareMatchTexts(data(),new AbortController().signal).catch(error=>error);
+   await vi.advanceTimersByTimeAsync(179999);expect(FakeWorker.all[0].terminate).not.toHaveBeenCalled();
+   await vi.advanceTimersByTimeAsync(1);expect((await result).message).toContain('시간이 초과');expect(FakeWorker.all[0].terminate).toHaveBeenCalledTimes(1);
+  }finally{vi.useRealTimers();}
+ });
 });
