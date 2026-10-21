@@ -1,4 +1,4 @@
-import { ApiClientError } from './apiClient';
+import { ApiClientError, checkApiHealth } from './apiClient';
 import { listServerItems } from './itemApi';
 import { listPoliceItems, type PoliceQuery } from './publicItemApi';
 import { readPublicList, savePublicList, type PublicListData, type PublicListRequest } from './publicListCache';
@@ -44,8 +44,26 @@ export function loadCommunityPublicList(type: ItemType): Promise<SourceState> {
   });
 }
 
-export function loadPolicePublicList(type: ItemType, query: PoliceQuery, shouldStore: () => boolean = () => true): Promise<SourceState> {
+const KEYWORD_HEALTH_TIMEOUT_MS = 4_000;
+let keywordHealthCheck: Promise<boolean> | null = null;
+
+/** One /api/health request at a time (concurrent failures share it), with a timeout and no retries. */
+function backendAnswers(): Promise<boolean> {
+  keywordHealthCheck ??= checkApiHealth({ timeoutMs: KEYWORD_HEALTH_TIMEOUT_MS })
+    .then(() => true, () => false)
+    .finally(() => { keywordHealthCheck = null; });
+  return keywordHealthCheck;
+}
+
+export async function loadPolicePublicList(type: ItemType, query: PoliceQuery, shouldStore: () => boolean = () => true): Promise<SourceState> {
   const { refresh: _refresh, ...conditions } = query;
-  return loadPublicList({ kind: type === 'lost' ? 'policeLost' : 'policeFound', query: { ...conditions }, page: query.page ?? 1, size: query.size ?? 50 },
+  const state = await loadPublicList({ kind: type === 'lost' ? 'policeLost' : 'policeFound', query: { ...conditions }, page: query.page ?? 1, size: query.size ?? 50 },
     () => listPoliceItems(type, query), shouldStore);
+  // A first-page 경찰청 분실물 keyword search that failed like a connection outage: tell a search-only failure
+  // (LOST QUEST still answers) apart from a real outage. Unknown or failed checks keep the general notice.
+  if (type === 'lost' && query.q?.trim() && (query.page ?? 1) === 1 && state.status === 'error' && state.dataStatus === 'unavailable' && !state.errorCode
+    && await backendAnswers()) {
+    return { ...state, backendReachable: true };
+  }
+  return state;
 }

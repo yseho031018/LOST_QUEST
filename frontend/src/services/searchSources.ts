@@ -26,6 +26,8 @@ export interface SourceState {
   cache?: PoliceCacheInfo;
   /** The server's ApiError code for a failed request (e.g. EXTERNAL_API_ERROR), when it sent one. */
   errorCode?: string;
+  /** A keyword request failed as a connection error, yet /api/health answered right after (the tunnel hid the server's reply). */
+  backendReachable?: boolean;
   refreshing?: boolean;
   refreshError?: string;
 }
@@ -59,11 +61,12 @@ export function applyPolicePage(previous: SourceState, result: SourceState, requ
 }
 
 /**
- * 경찰청 분실물 물품명 검색 API itself rejected the request (the server answered EXTERNAL_API_ERROR for a keyword
- * query), as opposed to a network, tunnel or server outage, which keep the general connection notice.
+ * A 경찰청 분실물 keyword search failed while LOST QUEST itself is up: either the server answered EXTERNAL_API_ERROR,
+ * or the request failed as a connection error but /api/health answered (Cloudflare replaces a 502 reply with its own
+ * page, so the server's code never arrives). Real network, tunnel or server outages keep the general connection notice.
  */
 export function isPoliceLostKeywordOutage(key: SourceKey, state: SourceState, keyword: string): boolean {
-  return key === 'policeLost' && !!keyword.trim() && state.status === 'error' && state.errorCode === 'EXTERNAL_API_ERROR';
+  return key === 'policeLost' && !!keyword.trim() && state.status === 'error' && (state.errorCode === 'EXTERNAL_API_ERROR' || state.backendReachable === true);
 }
 
 export function describeSourceError(cause: unknown): string {
