@@ -22,9 +22,10 @@ export async function loadPublicList(request: PublicListRequest, load: () => Pro
   } catch (error) {
     const errorMessage = describeSourceError(error);
     const connectionFailure = isPublicConnectionFailure(error);
+    const errorCode = error instanceof ApiClientError && error.serverCode ? { errorCode: error.serverCode } : {};
     // Additional-page failures belong to that page; they must not replace an existing result set.
     if (!connectionFailure || (request.kind.startsWith('police') && request.page > 1)) {
-      return { ...idleSource, status: 'error', dataStatus: connectionFailure ? 'unavailable' : 'request-error', error: errorMessage };
+      return { ...idleSource, status: 'error', dataStatus: connectionFailure ? 'unavailable' : 'request-error', error: errorMessage, ...errorCode };
     }
     // Restore the contiguous pages actually viewed for this exact police query, without mixing queries.
     const cached = request.kind.startsWith('police')
@@ -32,7 +33,7 @@ export async function loadPublicList(request: PublicListRequest, load: () => Pro
       : await readPublicList(request);
     return cached
       ? { ...idleSource, ...cached, status: 'ready', dataStatus: 'cached', lastSyncedAt: cached.updatedAt, error: errorMessage }
-      : { ...idleSource, status: 'error', dataStatus: 'unavailable', error: errorMessage };
+      : { ...idleSource, status: 'error', dataStatus: 'unavailable', error: errorMessage, ...errorCode };
   }
 }
 

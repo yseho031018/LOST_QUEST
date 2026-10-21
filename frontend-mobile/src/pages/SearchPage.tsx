@@ -6,7 +6,7 @@ import PublicListStatus from '../components/PublicListStatus';
 import { categories, regions } from '../data/seed';
 import { getPoliceFilters, type PoliceFilterOptions } from '../services/publicItemApi';
 import { loadCommunityPublicList, loadPolicePublicList } from '../services/publicListLoader';
-import { SOURCE_LABELS, applyPolicePage, buildPoliceQuery, describeSourceError, idleSource, type SourceKey, type SourceState } from '../services/searchSources';
+import { SOURCE_LABELS, applyPolicePage, buildPoliceQuery, describeSourceError, idleSource, isPoliceLostKeywordOutage, type SourceKey, type SourceState } from '../services/searchSources';
 import './SearchPage.css';
 
 const POLICE_PAGE_SIZE = 50;
@@ -139,6 +139,8 @@ export default function SearchPage() {
     setParams(next);
   };
   const submit = (e: FormEvent) => { e.preventDefault(); update('q', draft.trim()); };
+  // Back to the normal 경찰청 분실물 listing (dates, region, category) when its keyword search API is down.
+  const clearKeyword = () => { setDraft(''); update('q', ''); };
   const selectSource = (nextSource: 'community' | 'public', nextType?: 'lost' | 'found') => {
     const next = new URLSearchParams(paramsRef.current);
     next.set('source', nextSource);
@@ -181,7 +183,7 @@ export default function SearchPage() {
       const selected = source === 'public' && type === policeType;
       return <button key={policeType} aria-pressed={selected} className={selected ? 'active' : ''} onClick={()=>selectSource('public', policeType)}>경찰청 {policeType === 'lost' ? '분실물' : '습득물'}{selected && !anyLoading && sources[policeSource].status === 'ready' && <span>불러온 {policeLoaded}건</span>}</button>;
     })}</div>
-    <ul className="public-list-status-grid" aria-label="데이터 출처별 상태">{relevantSources.map(key => <PublicListStatus key={key} label={SOURCE_LABELS[key]} state={sources[key]} retry={() => retry(key)} refresh={key.startsWith('police') ? () => { void loadPolice(key as 'policeLost' | 'policeFound', 1, true); } : undefined} retryPage={key.startsWith('police') ? page => { void loadPolice(key as 'policeLost' | 'policeFound', page); } : undefined} />)}</ul>
+    <ul className="public-list-status-grid" aria-label="데이터 출처별 상태">{relevantSources.map(key => <PublicListStatus key={key} label={SOURCE_LABELS[key]} state={sources[key]} clearKeyword={isPoliceLostKeywordOutage(key, sources[key], query) ? clearKeyword : undefined} retry={() => retry(key)} refresh={key.startsWith('police') ? () => { void loadPolice(key as 'policeLost' | 'policeFound', 1, true); } : undefined} retryPage={key.startsWith('police') ? page => { void loadPolice(key as 'policeLost' | 'policeFound', page); } : undefined} />)}</ul>
     <div className="catalog-result-toolbar"><p>{query && <strong>‘{query}’ </strong>}검색 결과 <b>{invalidRange ? 0 : filtered.length}</b>개</p><div className="catalog-result-actions"><button className="button button-secondary filter-toggle" aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16}/>필터{activeCount > 0 && <b>{activeCount}</b>}</button><select aria-label="검색 결과 정렬" value={sort} onChange={e=>update('sort',e.target.value)}><option value="registered">최근 등록순</option><option value="latest">최신 날짜순</option><option value="oldest">오래된 날짜순</option></select></div></div>
     <div className={`search-filter-panel ${filtersOpen?'filters-open':''}`}><div className="filter-panel-label"><ListFilter size={17}/><strong>상세 조건</strong><button className="text-link" onClick={()=>reset(true)}>초기화<RotateCcw size={13}/></button></div><div className={`search-filter-fields ${source === 'public' ? 'police-date-fields' : ''}`}>
       {source === 'community' && <label className="form-field">유형<select aria-label="물품 유형" value={type} onChange={e=>update('type',e.target.value)}><option value="">전체 유형</option><option value="found">주인 찾기</option><option value="lost">내 물건 찾기</option></select></label>}

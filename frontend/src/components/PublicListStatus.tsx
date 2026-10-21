@@ -1,10 +1,11 @@
-import { CloudOff, Database, RefreshCw, CheckCircle2, Info } from 'lucide-react';
+import { CloudOff, Database, RefreshCw, CheckCircle2, Info, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { SourceState } from '../services/searchSources';
 import { formatRegistrationTime } from '../services/dateTime';
 import './PublicListStatus.css';
 
-export default function PublicListStatus({ label, state, retry, retryPage, refresh }: { label: string; state: SourceState; retry: () => void; retryPage?: (page: number) => void; refresh?: () => void }) {
+/** clearKeyword: set only when the 경찰청 분실물 keyword search API itself failed; shows its own notice and a way back. */
+export default function PublicListStatus({ label, state, retry, retryPage, refresh, clearKeyword }: { label: string; state: SourceState; retry: () => void; retryPage?: (page: number) => void; refresh?: () => void; clearKeyword?: () => void }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!state.cache) return;
@@ -19,7 +20,8 @@ export default function PublicListStatus({ label, state, retry, retryPage, refre
   const cached = state.dataStatus === 'cached';
   const unavailable = state.dataStatus === 'unavailable';
   const error = state.status === 'error';
-  const title = state.status === 'unsupported' ? '지원하지 않는 조건' : cached ? '저장된 데이터' : unavailable ? '서버 연결 불가' : error ? '조회 요청 오류' : loading ? '연결 확인 중' : state.cache?.stale ? '이전 조회 결과' : state.cache?.hit ? '서버 캐시' : '최신 데이터';
+  const keywordOutage = error && !!clearKeyword;
+  const title = state.status === 'unsupported' ? '지원하지 않는 조건' : keywordOutage ? '검색 서비스 일시 오류' : cached ? '저장된 데이터' : unavailable ? '서버 연결 불가' : error ? '조회 요청 오류' : loading ? '연결 확인 중' : state.cache?.stale ? '이전 조회 결과' : state.cache?.hit ? '서버 캐시' : '최신 데이터';
   const synced = state.lastSyncedAt ? formatRegistrationTime(new Date(state.lastSyncedAt).toISOString()) : null;
   const needsAttention = cached || unavailable || error || state.status === 'unsupported' || state.cache?.stale || !!state.refreshError;
   return <li className={`public-list-status ${cached ? 'is-cached' : error ? 'is-error' : ''}`}>
@@ -31,11 +33,13 @@ export default function PublicListStatus({ label, state, retry, retryPage, refre
       {synced && !needsAttention && !loading && <details className="public-list-status-details"><summary aria-label={`${label} 데이터 상세`}><Info size={16} aria-hidden="true" /></summary><div className="public-list-status-popover"><strong>{label}</strong><small>마지막 동기화 <time dateTime={new Date(state.lastSyncedAt!).toISOString()}>{synced}</time> (한국 시간)</small></div></details>}
     </div>
     {loading ? <span className="public-list-status-sr-only">공개 목록을 불러오고 있어요.</span> : state.status === 'unsupported' ? <p>{state.error}</p> : <>
-      {cached ? <p role="status">이 목록의 서버에 연결할 수 없어 저장된 목록을 읽기 전용으로 보여드려요. 최신 정보가 아닐 수 있습니다. 상세 조회·등록·수정·삭제·반환 요청은 재연결 후 이용해 주세요.</p>
+      {keywordOutage ? <p role="alert">경찰청 분실물 검색 서비스에 일시적인 문제가 있어요. 검색어를 지우고 날짜·지역·분류 조건으로 조회해 주세요.</p>
+        : cached ? <p role="status">이 목록의 서버에 연결할 수 없어 저장된 목록을 읽기 전용으로 보여드려요. 최신 정보가 아닐 수 있습니다. 상세 조회·등록·수정·삭제·반환 요청은 재연결 후 이용해 주세요.</p>
         : unavailable ? <p role="alert">이 조회 조건에 사용할 수 있는 저장 목록이 없어요. 서버 연결 후 다시 시도해 주세요.</p>
         : error ? <p role="alert">{state.error} 인증·권한·입력 오류는 저장된 목록으로 대체하지 않습니다.</p>
         : state.cacheSaved === false ? <p>이 브라우저에서는 목록을 저장하지 못했어요. 온라인 조회는 정상입니다.</p> : null}
       {synced && needsAttention && <small>마지막 동기화 <time dateTime={new Date(state.lastSyncedAt!).toISOString()}>{synced}</time> (한국 시간)</small>}
+      {keywordOutage && <button type="button" className="text-link" onClick={clearKeyword}><X size={14} />검색어 지우기</button>}
       {(cached || error) && <button type="button" className="text-link" onClick={retry}><RefreshCw size={14} />{cached || unavailable ? '다시 연결' : '다시 시도'}</button>}
       {(state.refreshError || state.cache?.refreshError) && <p role="alert">{state.refreshError || state.cache?.refreshError}</p>}
       {state.pageLoading && <p role="status">추가 페이지를 불러오고 있어요.</p>}
