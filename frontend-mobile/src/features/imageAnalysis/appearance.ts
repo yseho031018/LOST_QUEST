@@ -56,6 +56,13 @@ async function extract(image: Blob, categoryId: string, loading: () => void, sig
   return { vector: reply.vector!, category: reply.category! };
 }
 
+/** DINOv2 vector of a whole photo, plus CLIP's item type unless categoryId names one (then CLIP is skipped). */
+export async function photoFeatures(photo: Blob, categoryId: string, signal?: AbortSignal, onLoading?: () => void): Promise<Extracted> {
+  const file = photo instanceof File ? photo : new File([photo], 'photo', { type: photo.type });
+  const prepared = await prepare(file, { x: 0, y: 0, width: 1, height: 1 }, signal);
+  return extract(prepared.blob, categoryId, onLoading ?? (() => {}), signal);
+}
+
 /** CLIP text ↔ photo: probability of each English prompt for this photo (they sum to 1 over the given prompts). */
 export async function describeImage(file: File, prompts: string[], signal?: AbortSignal): Promise<RankedPrompt[]> {
   const prepared = await prepare(file, { x: 0, y: 0, width: 1, height: 1 }, signal);

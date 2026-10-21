@@ -10,6 +10,7 @@ import { formatRegistrationTime, todayInKorea } from '../services/dateTime'
 import './JourneyPages.css'
 
 import { categories, regions } from '../data/seed'
+import { takePhotoHandover } from '../features/photoSearch/handover'
 
 const examples = [
   { key: 'wallet', label: '검은색 지갑', title: '검은색 가죽 지갑', category: '지갑', color: '검정', description: '검은색 반지갑입니다. 겉면에 작은 스크래치가 있고 안쪽에 카드 수납공간이 있어요.' },
@@ -47,6 +48,22 @@ export default function RegisterPage() {
   const inputVersion = useRef(0)
 
   useEffect(() => { setStep(0); setRegistered(null); setError('') }, [type])
+  // "사진으로 찾기" hands over its photo and what it recognised (after login, if needed), so the form does not
+  // start from a sample. Only a signed-in lost-item form takes it.
+  useEffect(() => {
+    if (!isLoggedIn || found) return
+    const data = takePhotoHandover()
+    if (!data) return
+    choosePhoto(data.file)
+    setForm(previous => ({
+      ...previous,
+      title: data.title.slice(0, 60),
+      category: categories.includes(data.category) ? data.category : previous.category,
+      color: data.color.slice(0, 25),
+      description: '',
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, found])
 
   function update(key: keyof typeof form, value: string) {
     setForm(previous => ({ ...previous, [key]: value }))

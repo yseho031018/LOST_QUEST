@@ -18,6 +18,7 @@ const CommunityWritePage = lazy(() => import('./pages/CommunityWritePage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
 const QuestGamePage = lazy(() => import('./pages/QuestGamePage'));
 const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
+const PhotoSearchPage = lazy(() => import('./pages/PhotoSearchPage'));
 
 export default function App() {
   return <Layout><Suspense fallback={<div className="page-container empty-state" role="status"><span className="loading-dot" />화면을 준비하고 있어요.</div>}>
@@ -40,6 +41,7 @@ export default function App() {
       <Route path="/guide" element={<GuidePage />} />
       <Route path="/quest-game" element={<QuestGamePage />} />
       <Route path="/image-analysis" element={<ImageAnalysisPage />} />
+      <Route path="/photo-search" element={<PhotoSearchPage />} />
       <Route path="*" element={<div className="page-container empty-state"><p className="eyebrow">404 · 길을 잠시 벗어났어요</p><h1>이 페이지를 찾을 수 없어요.</h1><p>홈에서 새로운 탐색을 시작해 주세요.</p><Link className="button button-primary" to="/">홈으로 돌아가기</Link></div>} />
     </Routes>
   </Suspense></Layout>;

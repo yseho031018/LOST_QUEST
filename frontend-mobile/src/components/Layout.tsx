@@ -30,6 +30,7 @@ const screenTitles: [pattern: string, title: string][] = [
   ['/guide', '이용 안내'],
   ['/quest-game', '분실물 탐정 게임'],
   ['/image-analysis', 'AI 이미지 분석'],
+  ['/photo-search', '사진으로 찾기'],
 ];
 
 /** Focused flows hide the tab bar so their own actions stay within reach. */
@@ -38,6 +39,7 @@ const hideTabBarOn = ['/login', '/signup', '/items/:id/edit', '/returns/:id', '/
 const menuLinks = [
   { to: '/community', label: '커뮤니티', icon: UsersRound, tone: 'blue' },
   { to: '/community-inbox', label: '비공개 질문함', icon: Inbox, tone: 'mint' },
+  { to: '/photo-search', label: '사진으로 찾기', icon: ScanSearch, tone: 'purple' },
   { to: '/image-analysis', label: 'AI 이미지 분석', icon: ScanSearch, tone: 'purple' },
   { to: '/quest-game', label: '탐정 게임', icon: Gamepad2, tone: 'orange' },
   { to: '/guide', label: '이용 안내', icon: BookOpen, tone: 'blue' },

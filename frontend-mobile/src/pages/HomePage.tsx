@@ -9,7 +9,7 @@ const quickActions = [
   { icon: Wallet, label: '습득 등록', link: '/register?type=found', tone: 'mint' },
   { icon: Sparkles, label: '매칭 추천', link: '/matches', tone: 'purple' },
   { icon: Globe2, label: '전국 검색', link: '/search', tone: 'orange' },
-  { icon: ScanSearch, label: 'AI 비교', link: '/image-analysis', tone: 'purple' },
+  { icon: ScanSearch, label: '사진으로 찾기', link: '/photo-search', tone: 'purple' },
   { icon: UsersRound, label: '커뮤니티', link: '/community', tone: 'blue' },
   { icon: Gamepad2, label: '탐정 게임', link: '/quest-game', tone: 'orange' },
   { icon: BookOpen, label: '이용 안내', link: '/guide', tone: 'mint' },
@@ -69,9 +69,9 @@ export default function HomePage() {
           : <div className="home-recent-empty"><PackageSearch size={28} aria-hidden="true" /><p>아직 등록된 물건이 없어요.<br />첫 번째 물건을 등록해 보세요.</p><Link className="button button-primary" to="/register">물품 등록하기</Link></div>}
     </section>
 
-    <Link to="/image-analysis" className="home-section home-ai-banner">
+    <Link to="/photo-search" className="home-section home-ai-banner">
       <span className="home-ai-icon"><ScanSearch size={28} strokeWidth={1.5} aria-hidden="true" /></span>
-      <span className="home-ai-copy"><small>브라우저에서 실행하는 로컬 AI</small><strong>두 장의 사진으로 외형을 비교해 보세요</strong><span>사진은 외부로 보내지 않아요</span></span>
+      <span className="home-ai-copy"><small>로그인 없이 · 브라우저에서 실행하는 AI</small><strong>사진 한 장으로 주운 물건을 찾아보세요</strong><span>사진은 외부로 보내지 않아요</span></span>
       <ArrowRight size={20} aria-hidden="true" />
     </Link>
 

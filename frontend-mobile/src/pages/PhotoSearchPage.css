@@ -1,0 +1,66 @@
+/* "사진으로 찾기", sized for the phone-width app shell (the narrow-screen rules always apply). */
+.photo-search-page{padding-top:16px;padding-bottom:40px}
+.photo-search-hero{margin-top:14px;padding:30px 28px;border-radius:18px;background:linear-gradient(125deg,#eef4ff,#f5f1ff 60%,#ecf8f4);border:1px solid #e0e8f3}
+.photo-search-hero .eyebrow{display:inline-flex;align-items:center;gap:6px;color:#6f58b4}
+.photo-search-hero h1{margin-top:10px;font-size:2rem;line-height:1.35;letter-spacing:-.05em;color:#1b3a52}
+.photo-search-hero p{margin-top:12px;color:#5f7587;line-height:1.75;font-size:.9375rem}
+.photo-search-hero p strong{color:#2b5f8f}
+.photo-search-privacy{display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 13px;border-radius:10px;background:#ffffffb3;color:#4c7d6d;font-size:.8125rem}
+.photo-search-panel{margin-top:18px;padding:24px;display:grid;gap:14px}
+.photo-search-panel h2{display:flex;align-items:center;gap:9px;font-size:1.0625rem;color:#1b3a52}
+.photo-search-panel h2>span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1b3a52;color:#fff;font-size:.8125rem}
+.photo-search-panel h2 small{font-weight:500;color:#8a9aa7;font-size:.8125rem}
+.photo-search-step2{margin-top:6px}
+.photo-search-pick{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:26px 18px;border:1px dashed #cbd8e5;border-radius:14px;background:#f8fafc;justify-content:center}
+.photo-search-pick small{flex-basis:100%;text-align:center;color:#8394a2;font-size:.8125rem}
+.photo-search-preview{position:relative;border-radius:14px;overflow:hidden;background:#eef2f5;display:grid;place-items:center;max-height:340px}
+.photo-search-preview img{width:100%;max-height:340px;object-fit:contain}
+.photo-search-clear{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#0f2231b3;color:#fff}
+.photo-search-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.photo-search-options select{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #dbe5ee;border-radius:10px;background:#fff;font:inherit;font-size:1rem}
+.photo-search-run{width:100%;justify-content:center;min-height:50px;font-size:1rem}
+.photo-search-note{color:#8394a2;font-size:.8125rem;line-height:1.6;margin-top:-4px}
+.photo-search-progress{display:flex;align-items:center;gap:12px;margin-top:16px;padding:16px 18px;border:1px solid #e2dcf3;border-radius:12px;background:#f7f4fd;color:#6f58b4}
+.photo-search-progress>div{flex:1;display:grid;gap:8px}
+.photo-search-progress strong{font-size:.9375rem}
+.photo-search-bar{display:block;height:7px;border-radius:7px;background:#e7e1f6;overflow:hidden}
+.photo-search-bar>span{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,#7c63c6,#2874ed);transition:width .3s}
+.photo-search-error{margin-top:16px;padding:16px 18px;border:1px solid #efd6d2;border-radius:12px;background:#fff7f5;color:#9d5e53;display:grid;gap:6px}
+.photo-search-error p{font-size:.875rem;line-height:1.6}
+.photo-search-kind-chips{display:flex;flex-wrap:wrap;gap:8px}
+.photo-search-kind-chips button{padding:9px 13px;border:1px solid #d9e3ec;border-radius:999px;background:#fff;color:#3e5a70;font-size:.9375rem}
+.photo-search-kind-chips button.suggested{border-color:#8fb3e8;background:#edf4ff;color:#1f5fbf;font-weight:650}
+.photo-search-results{margin-top:24px}
+.photo-search-results-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 14px}
+.photo-search-results-heading h2{font-size:1.25rem;color:#1b3a52}
+.photo-search-results-heading span{color:#8394a2;font-size:.8125rem}
+.photo-search-detected{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px;color:#2f7a63;font-size:.875rem}
+.photo-search-detected .text-link{margin-left:auto;font-size:.8125rem}
+.photo-search-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.photo-search-list>li{position:relative;display:grid;grid-template-columns:88px minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 14px}
+.photo-search-list>li>img{width:88px;height:88px;border-radius:10px;object-fit:cover;background:#eef2f5}
+.photo-search-rank{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#1b3a52;color:#fff;font-size:.75rem;font-weight:700;z-index:1}
+.photo-search-item{display:grid;gap:4px;min-width:0}
+.photo-search-item strong{color:#1b3a52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-search-item>span{display:flex;align-items:center;gap:4px;color:#7d8f9d;font-size:.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-search-score{display:flex;align-items:center;gap:8px;margin-top:2px}
+.photo-search-score .photo-search-bar{flex:1}
+.photo-search-score b{color:#5a47a8;font-size:1rem;min-width:52px;text-align:right}
+.photo-search-item small{color:#8a9aa7;font-size:.75rem}
+.photo-search-list .button{min-height:40px;padding:8px 12px;font-size:.875rem;white-space:nowrap}
+.photo-search-empty{margin-top:14px;padding:22px;display:grid;gap:8px;justify-items:start;color:#5f7587}
+.photo-search-disclaimer{margin-top:12px;color:#8a9aa7;font-size:.75rem;line-height:1.6}
+.photo-search-cta{margin-top:16px;padding:20px;display:grid;gap:14px;background:#f4f8fc;border-color:#dde8f3}
+.photo-search-cta strong{color:#1b3a52}
+.photo-search-cta p{margin-top:4px;color:#5f7587;font-size:.875rem;line-height:1.6}
+.photo-search-cta-actions{display:flex;flex-wrap:wrap;gap:8px}
+.photo-search-spin{animation:photo-search-spin .8s linear infinite}
+@keyframes photo-search-spin{to{transform:rotate(360deg)}}
+.photo-search-hero{padding:24px 20px}.photo-search-hero h1{font-size:1.6rem}
+.photo-search-panel{padding:18px}
+.photo-search-list>li{grid-template-columns:72px minmax(0,1fr);padding:12px}
+.photo-search-list>li>img{width:72px;height:72px}
+.photo-search-list .button{grid-column:1/-1;justify-content:center}
+.photo-search-cta-actions .button{flex:1;justify-content:center}
+.photo-search-other{font-size:.8125rem;justify-self:start}
+.photo-search-options{grid-template-columns:minmax(0,1fr)}
