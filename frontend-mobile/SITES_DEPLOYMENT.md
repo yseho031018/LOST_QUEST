@@ -10,13 +10,14 @@
 PowerShell에서 `frontend-mobile` 폴더로 이동한 후 실행한다.
 
 ```powershell
-$env:VITE_API_BASE_URL = "https://mining-possibility-manufacture-objective.trycloudflare.com"
+$env:VITE_API_BASE_URL = "https://<현재 터널 주소>.trycloudflare.com"
+$env:VITE_API_CONFIG_URL = "https://raw.githubusercontent.com/yseho031018/LOST_QUEST/runtime-config/api-config.json"
 $env:VITE_REMOTE_VISION_MODELS = "true"
 npm test
 npm run build
 ```
 
-Cloudflare 임시 주소가 바뀌면 `VITE_API_BASE_URL`을 실제 주소로 바꿔 빌드하고, 모바일과 PC Sites를 각각 업데이트한다. 배포 대상은 모바일의 `dist`이다. 모델은 브라우저가 다운로드하므로 `dist/models`는 포함하지 않는다. `.env.local`의 개발용 5174 프록시 주소를 배포에 사용하지 않는다.
+`VITE_API_CONFIG_URL`을 넣어 빌드하면 사이트가 시작할 때 `runtime-config` 브랜치의 `api-config.json`(`{"apiBaseUrl": "https://….trycloudflare.com"}`)에서 서버 주소를 읽는다. Cloudflare 임시 주소가 바뀌면 이 파일만 고치면 되고 다시 빌드·배포할 필요가 없다. 반영까지 최대 약 5분 걸린다. `*.trycloudflare.com` 주소만 받아들이며, 파일을 읽지 못하면 빌드할 때 넣은 `VITE_API_BASE_URL`을 쓴다. PC 프론트도 같은 방식으로 빌드한다. 배포 대상은 모바일의 `dist`이다. 모델은 브라우저가 다운로드하므로 `dist/models`는 포함하지 않는다. `.env.local`의 개발용 5174 프록시 주소를 배포에 사용하지 않는다.
 
 ## 백엔드 CORS
 
