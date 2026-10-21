@@ -17,7 +17,7 @@ vi.mock('./LeafletMap', () => ({
 }));
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-type PanelItem = Pick<Item, 'id' | 'type' | 'source' | 'region' | 'location'>;
+type PanelItem = Pick<Item, 'id' | 'type' | 'source' | 'region' | 'location' | 'latitude' | 'longitude'>;
 const post = (over: Partial<PanelItem> = {}): PanelItem => ({ id: 'api-found-33', type: 'found', source: 'community', region: '서울', location: '송파구 잠실역 8번 출구', ...over });
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { map.mode = 'ok'; container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); vi.spyOn(console, 'error').mockImplementation(() => {}); });
@@ -52,6 +52,18 @@ describe('approved map positions', () => {
 });
 
 describe('location tab panel', () => {
+  it('prefers a saved user-selected coordinate over the legacy approximate position', async () => {
+    await render(post({latitude:37.5,longitude:127}));
+    expect(container.querySelector('[data-testid="leaflet-map"]')?.textContent).toBe('서울 송파구 잠실역 8번 출구');
+    expect(container.textContent).toContain('등록자가 지도에서 선택한 위치');
+    expect(container.textContent).not.toContain('대략적인 위치');
+  });
+  it('does not use malformed coordinates or untrusted public coordinates', async () => {
+    await render(post({id:'api-found-999',latitude:91,longitude:127}));
+    expect(container.querySelector('.detail-location-map')).toBeNull(); expect(kakao()).not.toBeNull();
+    await render(post({source:'public',latitude:37.5,longitude:127}));
+    expect(container.querySelector('.detail-location-map')).toBeNull();
+  });
   it('shows the map, the approximate-position notice and the stored text for an approved post', async () => {
     await render(post());
     expect(container.querySelector('[data-testid="leaflet-map"]')?.textContent).toBe('잠실역');

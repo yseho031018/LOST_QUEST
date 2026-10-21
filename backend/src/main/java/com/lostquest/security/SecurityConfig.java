@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/community/posts", "/api/community/posts/{id}", "/api/community/posts/{id}/comments").permitAll()
                         .requestMatchers("/api/community/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/public-items/image").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/me/items", "/api/lost-items/{id}/matches",
+                        .requestMatchers(HttpMethod.GET, "/api/places/search", "/api/auth/me", "/api/me/items", "/api/lost-items/{id}/matches",
                                 "/api/notifications", "/api/notifications/unread-count").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/lost-items", "/api/found-items").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/lost-items/{id}", "/api/found-items/{id}",

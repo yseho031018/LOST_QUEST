@@ -15,6 +15,31 @@ const FOUND = {
 const INPUT = { title: ' 검은색 가죽 지갑 ', category: '지갑', color: ' 검정 ', description: ' 겉면에 작은 스크래치가 있어요. ', date: '2026-09-16', region: '서울', location: ' 서울 성동구 서울숲역 ' };
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
+describe('optional registration coordinates', () => {
+  it('retains valid saved coordinates and ignores absent or invalid legacy coordinates', () => {
+    expect(fromServerItem('lost', {...LOST,latitude:37.54,longitude:127.04})).toMatchObject({latitude:37.54,longitude:127.04});
+    for (const pair of [[null,null],[37,null],[91,127],[37,Infinity],['37',127]]) {
+      const item=fromServerItem('lost',{...LOST,latitude:pair[0],longitude:pair[1]});
+      expect(item).not.toHaveProperty('latitude'); expect(item).not.toHaveProperty('longitude');
+    }
+  });
+  it('sends a confirmed pair in JSON and multipart registration', async () => {
+    const fetchMock=vi.fn().mockImplementation(async () => jsonResponse({...LOST,latitude:37.54,longitude:127.04}));vi.stubGlobal('fetch',fetchMock);
+    const input={...INPUT,latitude:37.54,longitude:127.04};
+    await createServerItem('lost',input,{...BASE,accessToken:TOKEN});
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({latitude:37.54,longitude:127.04});
+    await createServerItem('lost',input,{...BASE,accessToken:TOKEN,image:new Blob(['image'],{type:'image/png'})});
+    const form=fetchMock.mock.calls[1][1].body as FormData;
+    expect(JSON.parse(await (form.get('item') as Blob).text())).toMatchObject({latitude:37.54,longitude:127.04});
+  });
+  it('rejects incomplete or invalid pairs before creating a network request', async () => {
+    const fetchMock=vi.fn();vi.stubGlobal('fetch',fetchMock);
+    for(const pair of [[37,undefined],[undefined,127],[NaN,127],[37,181]])
+      await expect(createServerItem('lost',{...INPUT,latitude:pair[0],longitude:pair[1]},BASE)).rejects.toThrow('지도 위치');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });

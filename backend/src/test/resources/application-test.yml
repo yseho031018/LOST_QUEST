@@ -11,6 +11,9 @@ spring:
     hibernate:
       ddl-auto: create-drop
 app:
+  place-search:
+    enabled: false
+    url: http://127.0.0.1:9/search
   cors:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   police-api:

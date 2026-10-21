@@ -11,7 +11,7 @@ import type { Item } from '../types';
 import './JourneyPages.css';
 import './EditItemPage.css';
 
-type EditForm = Required<CreateItemInput>;
+type EditForm = Required<Omit<CreateItemInput, 'latitude' | 'longitude'>>;
 const emptyForm: EditForm = { title: '', category: '', color: '', description: '', date: '', region: '', location: '', ownershipQuestion: '', ownershipAnswer: '' };
 
 export default function EditItemPage() {
