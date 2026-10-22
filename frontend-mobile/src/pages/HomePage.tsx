@@ -5,10 +5,11 @@ import { useApp } from '../context/AppContext';
 import ItemCard from '../components/ItemCard';
 
 const quickActions = [
-  { icon: PackageSearch, label: '분실 등록', link: '/register?type=lost', tone: 'blue' },
-  { icon: Wallet, label: '습득 등록', link: '/register?type=found', tone: 'mint' },
+  // Browsing from the visitor's side; registering stays on the bottom bar's + button.
+  { icon: PackageSearch, label: '내 물건 찾기', link: '/search?source=community&type=found', tone: 'blue' },
+  { icon: Wallet, label: '주인 찾기', link: '/search?source=community&type=lost', tone: 'mint' },
   { icon: Sparkles, label: '매칭 추천', link: '/matches', tone: 'purple' },
-  { icon: Globe2, label: '전국 검색', link: '/search', tone: 'orange' },
+  { icon: Globe2, label: '전국 검색', link: '/search?source=public&type=lost', tone: 'orange' },
   { icon: ScanSearch, label: '사진으로 찾기', link: '/photo-search', tone: 'purple' },
   { icon: UsersRound, label: '커뮤니티', link: '/community', tone: 'blue' },
   { icon: Gamepad2, label: '탐정 게임', link: '/quest-game', tone: 'orange' },
