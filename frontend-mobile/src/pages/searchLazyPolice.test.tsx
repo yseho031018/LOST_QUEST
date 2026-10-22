@@ -213,9 +213,11 @@ describe('explicit police source loading', () => {
   });
   it('explains a failed 경찰청 분실물 keyword search and clears the keyword back to the date listing', async () => {
     const outage = new ApiClientError('HTTP_ERROR', '경찰청 공공데이터 서버가 요청을 처리하지 못했습니다.', 502, { serverCode: 'EXTERNAL_API_ERROR' });
-    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && query?.q) throw outage; return page(type); });
+    let listingDown = true;  // the newest-listing fallback fails too, so the search-only notice shows
+    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && (query?.q || listingDown)) throw outage; return page(type); });
     await mount('/search?source=public&type=lost&q=%EC%A7%80%EA%B0%91');
-    expect(listPoliceItems).toHaveBeenLastCalledWith('lost', expect.objectContaining({ q: '지갑' }));
+    expect(listPoliceItems).toHaveBeenCalledWith('lost', expect.objectContaining({ q: '지갑' }));
+    listingDown = false;
     expect(container.textContent).toContain('검색 요청 실패');
     expect(container.textContent).toContain('경찰청 분실물 검색 요청을 처리하지 못했어요. 검색어를 지우고 날짜·지역·분류 조건으로 조회하거나 잠시 후 다시 시도해 주세요.');
     expect(container.textContent).not.toContain('서버 연결 불가');
@@ -247,7 +249,8 @@ describe('explicit police source loading', () => {
   it('shows the search notice when the 경찰청 분실물 keyword request fails like a tunnel error but /api/health answers', async () => {
     const health = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: 'OK', service: 'LOST QUEST API' }), { headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', health);
-    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && query?.q) throw new ApiClientError('NETWORK_ERROR', '서버에 연결하지 못했어요.'); return page(type); });
+    let listingDown = true;
+    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && (query?.q || listingDown)) throw new ApiClientError('NETWORK_ERROR', '서버에 연결하지 못했어요.'); return page(type); });
     await mount('/search?source=public&type=lost&q=%EC%A7%80%EA%B0%91');
     expect(health).toHaveBeenCalledTimes(1);
     expect(String(health.mock.calls[0][0])).toBe('http://localhost:8080/api/health');
@@ -256,10 +259,33 @@ describe('explicit police source loading', () => {
     expect(container.textContent).not.toContain('서버 연결 불가');
     await flush();
     expect(health).toHaveBeenCalledTimes(1);
+    listingDown = false;
     await click([...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '검색어 지우기')!);
     expect(container.querySelector('output')?.textContent).toBe('/search?source=public&type=lost');
     expect(cards()).toEqual([expect.stringContaining('경찰청 지갑')]);
     expect(health).toHaveBeenCalledTimes(1);
+  });
+  it('shows matches from the newest 경찰청 분실물 listing when the keyword search is down', async () => {
+    const outage = new ApiClientError('HTTP_ERROR', '경찰청 공공데이터 서버가 요청을 처리하지 못했습니다.', 502, { serverCode: 'EXTERNAL_API_ERROR' });
+    const listing: PolicePage = { ...page('lost'), items: [
+      { ...police, id: 'police-lost-L1', title: '검정 반지갑' }, { ...police, id: 'police-lost-L2', title: '갤럭시 S23', category: '휴대폰' },
+      { ...police, id: 'police-lost-L3', title: '카드', category: '지갑', description: '검정 가죽 지갑 안 카드' } ] };
+    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => { if (type === 'lost' && query?.q) throw outage; return type === 'lost' ? listing : page(type); });
+    await mount('/search?source=public&type=lost&q=%EA%B2%80%EC%A0%95%20%EC%A7%80%EA%B0%91');
+    expect(vi.mocked(listPoliceItems).mock.calls.filter(([type, query]) => type === 'lost' && !query?.q).map(([, query]) => query?.page)).toEqual(expect.arrayContaining([1, 2, 3]));
+    expect(cards()).toEqual([expect.stringContaining('검정 반지갑'), expect.stringContaining('카드')]);
+    expect(container.textContent).toContain('최근 목록에서 찾음');
+    expect(container.textContent).toContain('최근 접수된 분실물 3건 중 검색어 ‘검정 지갑’에 맞는 2건을 보여 드려요.');
+    expect(container.textContent).not.toContain('검색어 지우기');
+  });
+  it('says so when the newest listing has no match for the keyword', async () => {
+    vi.mocked(listPoliceItems).mockImplementation(async (type, query) => {
+      if (type === 'lost' && query?.q) throw new ApiClientError('HTTP_ERROR', '경찰청 오류', 502, { serverCode: 'EXTERNAL_API_ERROR' });
+      return page(type);
+    });
+    await mount('/search?source=public&type=lost&q=%EC%95%85%EA%B8%B0');
+    expect(cards()).toEqual([]);
+    expect(container.textContent).toContain('검색어 ‘악기’에 맞는 0건을 보여 드려요.');
   });
   it('keeps 서버 연결 불가 when /api/health also fails, and never checks health for 습득물 or a lost listing without a keyword', async () => {
     const health = vi.fn().mockResolvedValue(new Response('<html>502 Bad gateway</html>', { status: 502, headers: { 'Content-Type': 'text/html' } }));

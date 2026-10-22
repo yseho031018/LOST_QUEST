@@ -21,9 +21,9 @@ export default function PublicListStatus({ label, state, retry, retryPage, refre
   const unavailable = state.dataStatus === 'unavailable';
   const error = state.status === 'error';
   const keywordOutage = error && !!clearKeyword;
-  const title = state.status === 'unsupported' ? '지원하지 않는 조건' : keywordOutage ? '검색 요청 실패' : cached ? '저장된 데이터' : unavailable ? '서버 연결 불가' : error ? '조회 요청 오류' : loading ? '연결 확인 중' : state.cache?.stale ? '이전 조회 결과' : state.cache?.hit ? '서버 캐시' : '최신 데이터';
+  const title = state.status === 'unsupported' ? '지원하지 않는 조건' : keywordOutage ? '검색 요청 실패' : state.keywordFallback ? '최근 목록에서 찾음' : cached ? '저장된 데이터' : unavailable ? '서버 연결 불가' : error ? '조회 요청 오류' : loading ? '연결 확인 중' : state.cache?.stale ? '이전 조회 결과' : state.cache?.hit ? '서버 캐시' : '최신 데이터';
   const synced = state.lastSyncedAt ? formatRegistrationTime(new Date(state.lastSyncedAt).toISOString()) : null;
-  const needsAttention = cached || unavailable || error || state.status === 'unsupported' || state.cache?.stale || !!state.refreshError;
+  const needsAttention = !!state.keywordFallback || cached || unavailable || error || state.status === 'unsupported' || state.cache?.stale || !!state.refreshError;
   return <li className={`public-list-status ${cached ? 'is-cached' : error ? 'is-error' : ''}`}>
     <div className="public-list-status-heading"><strong>{label}</strong>
       {!loading && !error && state.status !== 'unsupported' && <span className="public-list-status-count">{state.items.length.toLocaleString()}건{state.totalPages > 1 ? ` / 전체 ${state.totalCount.toLocaleString()}건` : ''}</span>}
@@ -34,6 +34,7 @@ export default function PublicListStatus({ label, state, retry, retryPage, refre
     </div>
     {loading ? <span className="public-list-status-sr-only">공개 목록을 불러오고 있어요.</span> : state.status === 'unsupported' ? <p>{state.error}</p> : <>
       {keywordOutage ? <p role="alert">경찰청 분실물 검색 요청을 처리하지 못했어요. 검색어를 지우고 날짜·지역·분류 조건으로 조회하거나 잠시 후 다시 시도해 주세요.</p>
+        : state.keywordFallback ? <p role="status">경찰청 검색어 조회가 일시적으로 안 돼서, 최근 접수된 분실물 {state.keywordFallback.scanned.toLocaleString()}건 중 검색어 ‘{state.keywordFallback.keyword}’에 맞는 {state.items.length.toLocaleString()}건을 보여 드려요.</p>
         : cached ? <p role="status">이 목록의 서버에 연결할 수 없어 저장된 목록을 읽기 전용으로 보여드려요. 최신 정보가 아닐 수 있습니다. 상세 조회·등록·수정·삭제·반환 요청은 재연결 후 이용해 주세요.</p>
         : unavailable ? <p role="alert">이 조회 조건에 사용할 수 있는 저장 목록이 없어요. 서버 연결 후 다시 시도해 주세요.</p>
         : error ? <p role="alert">{state.error} 인증·권한·입력 오류는 저장된 목록으로 대체하지 않습니다.</p>
