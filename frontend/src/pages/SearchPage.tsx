@@ -145,6 +145,7 @@ export default function SearchPage() {
     const next = new URLSearchParams(paramsRef.current);
     next.set('source', nextSource);
     if (nextSource === 'public') next.set('type', nextType ?? 'lost');
+    else if (nextType) next.set('type', nextType);
     else if (source === 'public') next.delete('type');
     paramsRef.current = next;
     setParams(next);
@@ -169,7 +170,6 @@ export default function SearchPage() {
   const policeCategory = policeFilters.options?.categories.find(c => c.value === pCategory);
   const policeFiltersDisabled = keywordMode || policeFilters.status !== 'ready';
   const policeLoaded = sources[policeSource].items.length;
-  const communityCount = sources.communityLost.items.length + sources.communityFound.items.length;
   const relevantSources = visibleSources.filter(key => !type || key.endsWith(type === 'lost' ? 'Lost' : 'Found'));
   const hasStoredData = relevantSources.some(key => sources[key].dataStatus === 'cached');
   const hasUnavailableData = relevantSources.some(key => sources[key].dataStatus === 'unavailable' || sources[key].status === 'error');
@@ -179,7 +179,12 @@ export default function SearchPage() {
 
   return <div className="page-container search-page"><div className="page-heading"><span className="eyebrow"><Globe2 size={15}/>{source === 'community' ? 'LOST QUEST 물품 검색' : '경찰청 공공데이터 검색'}</span><h1>당신의 소중한 물건, 함께 찾아볼까요?</h1><p>{source === 'community' ? '회원이 등록한 ‘내 물건 찾기’·‘주인 찾기’ 글을 찾아보세요. 경찰청 자료는 경찰청 분실물·습득물 탭에서 따로 조회할 수 있어요.' : '경찰청에 접수된 분실물·습득물을 찾아보세요. 회원이 등록한 물품은 LOST QUEST 탭에서 확인할 수 있어요.'}</p><div className="button-row"><Link className="text-link" to="/community-inbox">내 비공개 질문함</Link><Link className="text-link" to="/community">이웃과 이야기 나누기</Link></div></div>
     <form className="catalog-search" onSubmit={submit}><Search size={22}/><input aria-label="물품 이름 또는 특징 검색" value={draft} onChange={e=>setDraft(e.target.value)} placeholder="물품 이름, 색상, 장소로 검색해 보세요" maxLength={100}/><button className="button button-primary" type="submit">검색</button></form>
-    <div className="source-tabs" role="group" aria-label="데이터 출처"><button aria-pressed={source==='community'} className={source==='community'?'active':''} onClick={()=>selectSource('community')}>LOST QUEST{communityCount > 0 && <span>{communityCount}</span>}</button>{(['lost', 'found'] as const).map(policeType => {
+    <div className="source-tabs" role="group" aria-label="데이터 출처">{(['lost', 'found'] as const).map(communityType => {
+      // Without a type both LOST QUEST lists are shown, so both tabs read as selected.
+      const selected = source === 'community' && (!type || type === communityType);
+      const count = sources[communityType === 'lost' ? 'communityLost' : 'communityFound'].items.length;
+      return <button key={`community-${communityType}`} aria-pressed={selected} className={selected ? 'active' : ''} onClick={()=>selectSource('community', communityType)}>{communityType === 'lost' ? '내 물건 찾기' : '주인 찾기'}{count > 0 && <span>{count}</span>}</button>;
+    })}{(['lost', 'found'] as const).map(policeType => {
       const selected = source === 'public' && type === policeType;
       return <button key={policeType} aria-pressed={selected} className={selected ? 'active' : ''} onClick={()=>selectSource('public', policeType)}>경찰청 {policeType === 'lost' ? '분실물' : '습득물'}{selected && !anyLoading && sources[policeSource].status === 'ready' && <span>불러온 {policeLoaded}건</span>}</button>;
     })}</div>

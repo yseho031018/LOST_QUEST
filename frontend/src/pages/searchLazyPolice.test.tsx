@@ -45,7 +45,9 @@ async function mount(path = '/search', strict = false) {
   const app = <MemoryRouter initialEntries={[path]}><MatchNotificationProvider><Routes><Route path="/" element={<HomePage />} /><Route path="/search" element={<SearchPage />} /><Route path="/mypage" element={<p>알림 화면</p>} /></Routes><Controls /></MatchNotificationProvider></MemoryRouter>;
   await act(async () => root.render(strict ? <StrictMode>{app}</StrictMode> : app)); await flush();
 }
-const tabs = () => [...container.querySelectorAll<HTMLButtonElement>('.source-tabs > button')];
+const allTabs = () => [...container.querySelectorAll<HTMLButtonElement>('.source-tabs > button')];
+// [내 물건 찾기, 경찰청 분실물, 경찰청 습득물]: the positions these tests were written for (주인 찾기 has its own test).
+const tabs = () => { const all = allTabs(); return [all[0], all[2], all[3]]; };
 const cards = () => [...container.querySelectorAll('a.item-card')].map(card => card.textContent);
 const statusRows = () => [...container.querySelectorAll('.public-list-status-grid > li')];
 const moreButtons = () => [...container.querySelectorAll<HTMLButtonElement>('.catalog-load-more > button')];
@@ -149,7 +151,7 @@ describe('explicit police source loading', () => {
     expect(getPoliceFilters).toHaveBeenCalledOnce();
   });
 
-  it('uses color only for found items and clears the public tab type on return to LOST QUEST', async () => {
+  it('uses color only for found items and switches to 내 물건 찾기 when leaving the police tabs', async () => {
     await mount('/search?source=public&type=found&pRegion=LCA000&pColor=CL1002');
     expect(listPoliceItems).toHaveBeenLastCalledWith('found', { region: 'LCA000', color: 'CL1002', page: 1, size: 50 });
     expect(container.querySelector<HTMLSelectElement>('select[aria-label="경찰청 습득물 색상"]')?.value).toBe('CL1002');
@@ -159,8 +161,21 @@ describe('explicit police source loading', () => {
     await click(tabs()[2]);
     expect(listPoliceItems).toHaveBeenLastCalledWith('found', { region: 'LCA000', color: 'CL1002', page: 1, size: 50 });
     await click(tabs()[0]);
-    expect(container.querySelector<HTMLSelectElement>('select[aria-label="물품 유형"]')?.value).toBe('');
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="물품 유형"]')?.value).toBe('lost');
     expect(cards()).toEqual([expect.stringContaining(own.title)]);
+  });
+  it('splits LOST QUEST into 내 물건 찾기 and 주인 찾기 tabs, both selected when no type is chosen', async () => {
+    await mount('/search');
+    expect(allTabs().map(tab => tab.textContent)).toEqual(['내 물건 찾기1', '주인 찾기', '경찰청 분실물', '경찰청 습득물']);
+    expect(allTabs().slice(0, 2).map(tab => tab.getAttribute('aria-pressed'))).toEqual(['true', 'true']);
+    await click(allTabs()[1]);
+    expect(container.querySelector('output')?.textContent).toBe('/search?source=community&type=found');
+    expect(allTabs().slice(0, 2).map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(cards()).toEqual([]);
+    await click(allTabs()[0]);
+    expect(container.querySelector('output')?.textContent).toBe('/search?source=community&type=lost');
+    expect(cards()).toEqual([expect.stringContaining(own.title)]);
+    expectNoPolice();
   });
 
   it('ignores a late first page after switching to the other police type', async () => {
