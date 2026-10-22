@@ -7,7 +7,7 @@ const services = [
   { icon: Search, title: '잃어버렸어요', text: '잃어버린 물건을 등록하고 함께 찾아요', link: '/register?type=lost', tone: 'blue', label: '내 물건 찾기 등록' },
   { icon: Wallet, title: '주인을 찾아요', text: '습득한 물건에 일상을 돌려주세요', link: '/register?type=found', tone: 'mint', label: '주인 찾기 등록' },
   { icon: ScanSearch, title: '사진으로 찾아요', text: '사진 한 장으로 닮은 주운 물건을 찾아요', link: '/photo-search', tone: 'purple', label: '사진으로 찾기' },
-  { icon: Globe2, title: '전국을 한눈에', text: '전국의 잃어버린 물건 정보를 한곳에서', link: '/search', tone: 'orange', label: '전국 통합 검색' },
+  { icon: Globe2, title: '전국을 한눈에', text: '경찰청에 접수된 전국의 분실물·습득물을 한곳에서', link: '/search?source=public&type=lost', tone: 'orange', label: '전국 통합 검색' },
 ];
 
 export default function HomePage() {
