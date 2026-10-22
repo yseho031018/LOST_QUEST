@@ -14,6 +14,8 @@ import { hasRegistrationLocationMismatch } from '../services/registrationLocatio
 
 import { categories, regions } from '../data/seed'
 import { takePhotoHandover } from '../features/photoSearch/handover'
+import { suggestItem } from '../features/imageAnalysis/suggestItem'
+import { releaseAppearanceResources } from '../features/imageAnalysis/appearance'
 
 const examples = [
   { key: 'wallet', label: '검은색 지갑', title: '검은색 가죽 지갑', category: '지갑', color: '검정', description: '검은색 반지갑입니다. 겉면에 작은 스크래치가 있고 안쪽에 카드 수납공간이 있어요.' },
@@ -44,6 +46,8 @@ export default function RegisterPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzed, setAnalyzed] = useState(false)
   const [suggestion, setSuggestion] = useState({ title: '', category: '', color: '' })
+  const [aiNote, setAiNote] = useState('')
+  const analysisAbort = useRef<AbortController | null>(null)
   const [registered, setRegistered] = useState<Item | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [readingPhoto, setReadingPhoto] = useState(false)
@@ -54,6 +58,8 @@ export default function RegisterPage() {
   const inputVersion = useRef(0)
 
   useEffect(() => { setStep(0); setRegistered(null); setError('') }, [type])
+  // The photo model runs in a worker; stop it and free its memory when leaving the page.
+  useEffect(() => () => { analysisAbort.current?.abort(); releaseAppearanceResources() }, [])
   // "사진으로 찾기" hands over its photo and what it recognised (after login, if needed), so the form does not
   // start from a sample. Only a signed-in lost-item form takes it.
   useEffect(() => {
@@ -79,6 +85,7 @@ export default function RegisterPage() {
   function chooseExample(key: string) {
     const sample = examples.find(example => example.key === key)!
     inputVersion.current += 1
+    analysisAbort.current?.abort()
     setSelected(key)
     setImage(`/images/${key}.svg`)
     setImageFile(null)
@@ -95,6 +102,7 @@ export default function RegisterPage() {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) { setError('PNG, JPG, WebP 이미지만 선택할 수 있어요.'); return }
     if (file.size > MAX_IMAGE_BYTES) { setError('10MB 이하의 이미지를 선택해 주세요.'); return }
     const version = ++inputVersion.current
+    analysisAbort.current?.abort()
     setReadingPhoto(true)
     const reader = new FileReader()
     reader.onload = () => {
@@ -116,9 +124,31 @@ export default function RegisterPage() {
     reader.readAsDataURL(file)
   }
   function simulateAnalysis() {
+    analysisAbort.current?.abort()
     setAnalyzing(true)
     setAnalyzed(false)
+    setAiNote('')
     const version = inputVersion.current
+    // The user's own photo: type, colour and title come from the photo model in this browser (nothing is uploaded).
+    if (imageFile) {
+      const controller = new AbortController()
+      analysisAbort.current = controller
+      void suggestItem(imageFile, controller.signal).then(result => {
+        if (version !== inputVersion.current) return
+        setSuggestion({ title: result.title, category: result.category, color: result.color })
+        setAiNote(!result.kindLabel ? '사진에서 물품을 알아보지 못했어요. 물품이 잘 보이게 다시 찍거나 직접 입력해 주세요.'
+          : !result.kindConfident ? `종류가 확실하지 않아요(${result.kindLabel}처럼 보여요). 맞는지 확인해 주세요.`
+          : !result.color ? '색상은 확실하지 않아 비워 두었어요. 직접 입력해 주세요.' : '')
+        setAnalyzed(true)
+      }, () => {
+        if (version !== inputVersion.current || controller.signal.aborted) return
+        setError('사진을 분석하지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요.')
+      }).finally(() => {
+        if (version === inputVersion.current && !controller.signal.aborted) setAnalyzing(false)
+        if (analysisAbort.current === controller) analysisAbort.current = null
+      })
+      return
+    }
     const sample = examples.find(example => example.key === selected)
     const nextSuggestion = sample ? { title: sample.title, category: sample.category, color: sample.color } : { title: form.title || '테스트 물품', category: form.category, color: form.color || '검정' }
     window.setTimeout(() => {
@@ -170,7 +200,7 @@ export default function RegisterPage() {
           <div className="register-photo-row"><div className="register-photo"><img src={image} alt="등록할 물품 미리보기" /><span><FileImage size={14} /> {selected ? '가상 샘플' : '선택한 사진'}</span></div><button type="button" className="photo-upload" onClick={() => fileInput.current?.click()}><ImagePlus size={30} strokeWidth={1.6} /><strong>사진 업로드</strong><span>JPG, PNG, WebP · 최대 10MB</span></button><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="물품 사진 선택" onChange={event => choosePhoto(event.target.files?.[0])} /></div>
           <p className="photo-file-name"><Camera size={14} /> {fileName}</p>
           <div className="register-examples"><span>샘플로 빠르게 체험하기</span><div>{examples.map(example => <button type="button" key={example.key} onClick={() => chooseExample(example.key)} className={selected === example.key ? 'selected' : ''}>{example.label}</button>)}</div></div>
-          <div className="analysis-panel"><div className="analysis-panel-top"><span className="analysis-icon"><Sparkles size={21} /></span><div><strong>AI가 찾아주는 물품의 특징</strong><p>선택한 샘플·입력값을 바탕으로 제안하는 시뮬레이션이에요.</p></div><span className="badge badge-blue">데모</span></div>{analyzed ? <><dl className="analysis-results"><div><dt>물품명</dt><dd>{suggestion.title}</dd></div><div><dt>종류</dt><dd>{suggestion.category}</dd></div><div><dt>색상</dt><dd>{suggestion.color}</dd></div></dl><button type="button" className="button analysis-apply" onClick={() => { setForm(previous => ({ ...previous, ...suggestion })); setError('') }}><Check size={16} /> 이 정보로 입력하기</button></> : <button type="button" disabled={analyzing} onClick={simulateAnalysis} className="button analysis-apply"><Sparkles size={16} className={analyzing ? 'pulse-icon' : ''} /> {analyzing ? '샘플 특징을 준비하고 있어요…' : 'AI 분석 시뮬레이션 실행'}</button>}</div>
+          <div className="analysis-panel"><div className="analysis-panel-top"><span className="analysis-icon"><Sparkles size={21} /></span><div><strong>AI가 찾아주는 물품의 특징</strong><p>{imageFile ? '올린 사진을 이 기기 안에서 AI가 분석해 종류·색상·물품명을 제안해요. 사진은 분석을 위해 밖으로 보내지 않아요.' : '샘플은 미리 준비된 값을 보여 줘요. 내 사진을 올리면 AI가 직접 분석해요.'}</p></div><span className="badge badge-blue">{imageFile ? 'AI' : '데모'}</span></div>{analyzed ? <><dl className="analysis-results"><div><dt>물품명</dt><dd>{suggestion.title || '직접 입력해 주세요'}</dd></div><div><dt>종류</dt><dd>{suggestion.category || '직접 입력해 주세요'}</dd></div><div><dt>색상</dt><dd>{suggestion.color || '직접 입력해 주세요'}</dd></div></dl>{aiNote && <p className="register-ai-note" role="status">{aiNote}</p>}<button type="button" className="button analysis-apply" onClick={() => { setForm(previous => ({ ...previous, title: suggestion.title || previous.title, category: suggestion.category || previous.category, color: suggestion.color || (imageFile ? '' : previous.color) })); setError('') }}><Check size={16} /> 이 정보로 입력하기</button></> : <button type="button" disabled={analyzing} onClick={simulateAnalysis} className="button analysis-apply"><Sparkles size={16} className={analyzing ? 'pulse-icon' : ''} /> {analyzing ? (imageFile ? 'AI가 사진을 분석하고 있어요… (처음에는 준비에 시간이 걸려요)' : '샘플 특징을 준비하고 있어요…') : (imageFile ? 'AI로 사진 분석하기' : 'AI 분석 시뮬레이션 실행')}</button>}</div>
           <div className="journey-section-title register-section-divider"><span>02</span><div><h2>기억나는 정보를 알려 주세요</h2><p className="muted"><span className="required-star">*</span> 표시는 필수 입력 항목이에요.</p></div></div>
           <div className="register-fields"><div className="form-field span-two"><label htmlFor="item-title">물품명 <span className="required-star">*</span></label><input id="item-title" value={form.title} onChange={event => update('title', event.target.value)} maxLength={60} placeholder="예) 검은색 가죽 지갑" required /></div><div className="form-field"><label htmlFor="item-category">종류 <span className="required-star">*</span></label><select id="item-category" value={form.category} onChange={event => update('category', event.target.value)}>{categories.map(category => <option key={category}>{category}</option>)}</select></div><div className="form-field"><label htmlFor="item-color">색상 <span className="required-star">*</span></label><input id="item-color" value={form.color} onChange={event => update('color', event.target.value)} maxLength={25} placeholder="예) 검정" required /></div><div className="form-field"><label htmlFor="item-date">{found ? '습득' : '분실'} 날짜 <span className="required-star">*</span></label><input id="item-date" type="date" max={todayInKorea()} value={form.date} onChange={event => update('date', event.target.value)} required /></div><div className="form-field"><label htmlFor="item-region">지역 <span className="required-star">*</span></label><select id="item-region" aria-describedby={locationMismatch ? 'item-location-warning' : undefined} value={form.region} onChange={event => update('region', event.target.value)}>{regions.map(region => <option key={region}>{region}</option>)}</select></div><div className="form-field span-two register-location-field"><label htmlFor="item-location">상세 장소 <span className="required-star">*</span></label><input id="item-location" value={form.location} onChange={event => update('location', event.target.value)} maxLength={100} placeholder="예: 성남시 단대오거리역 2번 출구 앞" aria-describedby={locationMismatch ? 'item-location-help item-location-warning' : 'item-location-help'} required /><small id="item-location-help" className="register-location-help">실제 분실·습득 장소를 직접 입력해 주세요.</small>{locationMismatch && <p id="item-location-warning" className="register-location-warning" role="status"><Info size={17} aria-hidden="true" /><span>선택한 지역과 입력한 장소가 다른 것 같아요. 위치를 다시 확인해 주세요.</span></p>}{locationReset && <small role="status" className="register-location-help">장소가 변경되어 이전 지도 선택을 해제했어요. 필요하면 다시 선택해 주세요.</small>}<RegistrationLocationPicker location={form.location} selected={selectedLocation} onClear={() => { setSelectedLocation(null); setLocationReset(false) }} onConfirm={selection => { setForm(previous => ({ ...previous, location: selection.location, ...(selection.region ? { region: selection.region } : {}) })); setSelectedLocation(selection); setLocationReset(false); setError('') }} /></div></div>
         </> : <>

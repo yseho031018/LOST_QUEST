@@ -378,3 +378,6 @@
  .photo-compare-layer { padding:0; } .photo-compare-sheet { border-radius:0; min-height:100%; padding:12px 14px 4px; } 
 /* Register: situation questions instead of type names; on phones both halves share the width evenly. */
  .register-tabs { display:grid; grid-template-columns:1fr 1fr; width:100%; } .register-tabs button { padding:9px 10px; word-break:keep-all; } 
+
+/* Register photo analysis: why a suggestion is uncertain or left empty. */
+.analysis-panel .register-ai-note{margin:10px 0 0;font-size:0.8125rem;line-height:1.6;color:#8a5a12;background:#fff7e6;border-radius:8px;padding:8px 10px}
