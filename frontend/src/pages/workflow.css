@@ -33,6 +33,7 @@
 /* QR step: code input, confirm and reissue buttons stacked at one width. */
 .qr-verify-form { display: flex; flex-direction: column; gap: 12px; }
 .qr-verify-form > .button, .return-main > .qr-renew-button { width: 100%; max-width: 400px; }
+.qr-verify-form > .qr-scan-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .return-main > .qr-renew-button { margin-top: 10px; }
 .workflow-hint { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 23px; background: #f5f8fc; border-radius: 8px; padding: 12px; color: #65788e; font-size: 0.9375rem; line-height: 1.65; }
 .workflow-hint svg { flex-shrink: 0; margin-top: 2px; }
