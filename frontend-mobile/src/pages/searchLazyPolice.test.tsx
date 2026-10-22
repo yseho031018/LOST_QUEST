@@ -116,6 +116,29 @@ describe('explicit police source loading', () => {
     await mount('/search', true); expectNoPolice(); expect(cards()).toHaveLength(1);
   });
 
+  it('fetches the first 50 of both 경찰청 tabs in the background and opens them without a new request', async () => {
+    await mount('/search'); expectNoPolice();
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1300)); }); await flush();
+    expect(listPoliceItems).toHaveBeenCalledTimes(2);
+    expect(listPoliceItems).toHaveBeenCalledWith('lost', expect.objectContaining({ page: 1, size: 50 }));
+    expect(listPoliceItems).toHaveBeenCalledWith('found', expect.objectContaining({ page: 1, size: 50 }));
+    expect(getPoliceFilters).not.toHaveBeenCalled(); expect(refreshMatchNotifications).not.toHaveBeenCalled();
+    expect(cards()).toEqual([expect.stringContaining(own.title)]);
+    await click(tabs()[1]); expect(cards()).toEqual([expect.stringContaining(police.title)]);
+    await click(tabs()[2]); expect(cards()).toEqual([expect.stringContaining(policeFound.title)]);
+    expect(listPoliceItems).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks again when the background fetch failed', async () => {
+    vi.mocked(listPoliceItems).mockRejectedValueOnce(new ApiClientError('HTTP_ERROR', '잠시 후 다시 시도해 주세요.', 500));
+    await mount('/search');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1300)); }); await flush();
+    expect(listPoliceItems).toHaveBeenCalledTimes(2);
+    await click(tabs()[1]);
+    expect(listPoliceItems).toHaveBeenCalledTimes(3);
+    expect(cards()).toEqual([expect.stringContaining(police.title)]);
+  });
+
   it('applies only supported keyword filters after switching from own search', async () => {
     await mount('/search?q=지갑&region=부산&category=휴대폰&from=2026-10-14&to=2026-10-15&pRegion=LCA000&pColor=CL1002');
     expectNoPolice(); await click(tabs()[1]);

@@ -10,6 +10,10 @@ import { SOURCE_LABELS, applyPolicePage, buildPoliceQuery, describeSourceError, 
 import './SearchPage.css';
 
 const POLICE_PAGE_SIZE = 50;
+// The first 경찰청 page of each tab is fetched in the background shortly after the page opens, so the tab opens at once.
+const POLICE_PREFETCH_DELAY_MS = 1_200;
+const POLICE_PREFETCH_MAX_AGE_MS = 5 * 60_000;
+const POLICE_KEYS = ['policeLost', 'policeFound'] as const;
 
 export default function SearchPage() {
   // Sources: LOST QUEST registrations and shared, cached 경찰청 lists via the backend.
@@ -86,6 +90,7 @@ export default function SearchPage() {
   const refreshEpoch = useRef({ policeLost: 0, policeFound: 0 });
   const refreshing = useRef(new Set<string>());
   const pendingPolice = useRef(new Map<string, Promise<SourceState>>());
+  const prefetchedPolice = useRef(new Map<string, { at: number; state: Promise<SourceState> }>());
   const loadPolice = useCallback(async (key: 'policeLost' | 'policeFound', page: number, refresh = false) => {
     if (activeSource.current !== 'public' || activePoliceSource.current !== key) return;
     const refreshKey = `${key}:${policeKey}`;
@@ -102,8 +107,14 @@ export default function SearchPage() {
     const pendingKey = `${refreshKey}:${page}:${epoch}:${refresh}`;
     let pending = pendingPolice.current.get(pendingKey);
     if (!pending) {
-      pending = loadPolicePublicList(key === 'policeLost' ? 'lost' : 'found', { ...JSON.parse(policeKey), page, size: POLICE_PAGE_SIZE, ...(refresh ? { refresh: true } : {}) },
+      const fetchPage = () => loadPolicePublicList(key === 'policeLost' ? 'lost' : 'found', { ...JSON.parse(policeKey), page, size: POLICE_PAGE_SIZE, ...(refresh ? { refresh: true } : {}) },
         () => refreshEpoch.current[key] === epoch);
+      // A recent background fetch of this exact first page is used once; a failed one is simply fetched again.
+      const warm = page === 1 && !refresh ? prefetchedPolice.current.get(refreshKey) : undefined;
+      if (warm) prefetchedPolice.current.delete(refreshKey);
+      pending = warm && Date.now() - warm.at < POLICE_PREFETCH_MAX_AGE_MS
+        ? warm.state.then(state => state.status === 'ready' && state.dataStatus === 'live' ? state : fetchPage())
+        : fetchPage();
       pendingPolice.current.set(pendingKey, pending);
       void pending.finally(() => pendingPolice.current.delete(pendingKey));
     }
@@ -122,6 +133,21 @@ export default function SearchPage() {
       });
     }
   }, [policeKey]);
+  // Warm the 경찰청 tabs the visitor is not looking at (both, from the LOST QUEST tabs) with the same conditions.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const key of POLICE_KEYS) {
+        if (source === 'public' && key === policeSource) continue;
+        const conditions = buildPoliceQuery({ q: query, from, to, region: pRegion, category: pCategory, subCategory: pSub, color: key === 'policeFound' ? pColor : '' });
+        const cacheKey = `${key}:${JSON.stringify(conditions)}`;
+        const known = prefetchedPolice.current.get(cacheKey);
+        if (known && Date.now() - known.at < POLICE_PREFETCH_MAX_AGE_MS) continue;
+        prefetchedPolice.current.set(cacheKey, { at: Date.now(), state: loadPolicePublicList(key === 'policeLost' ? 'lost' : 'found', { ...conditions, page: 1, size: POLICE_PAGE_SIZE }) });
+      }
+    }, POLICE_PREFETCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [source, policeSource, query, from, to, pRegion, pCategory, pSub, pColor]);
+
   useEffect(() => {
     policeVersion.current += 1;
     if (source !== 'public') return;
