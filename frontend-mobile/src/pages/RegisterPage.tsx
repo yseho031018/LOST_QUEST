@@ -115,6 +115,7 @@ export default function RegisterPage() {
       setAnalyzing(false)
       setError('')
       setReadingPhoto(false)
+      analyzePhoto(file)
     }
     reader.onerror = () => {
       if (version !== inputVersion.current) return
@@ -123,40 +124,31 @@ export default function RegisterPage() {
     }
     reader.readAsDataURL(file)
   }
-  function simulateAnalysis() {
+  function analyzePhoto(file: File | null = imageFile) {
+    // No photo yet: open the picker; choosing one starts the analysis by itself (see choosePhoto).
+    if (!file) { fileInput.current?.click(); return }
     analysisAbort.current?.abort()
     setAnalyzing(true)
     setAnalyzed(false)
     setAiNote('')
     const version = inputVersion.current
-    // The user's own photo: type, colour and title come from the photo model in this browser (nothing is uploaded).
-    if (imageFile) {
-      const controller = new AbortController()
-      analysisAbort.current = controller
-      void suggestItem(imageFile, controller.signal).then(result => {
-        if (version !== inputVersion.current) return
-        setSuggestion({ title: result.title, category: result.category, color: result.color })
-        setAiNote(!result.kindLabel ? '사진에서 물품을 알아보지 못했어요. 물품이 잘 보이게 다시 찍거나 직접 입력해 주세요.'
-          : !result.kindConfident ? `종류가 확실하지 않아요(${result.kindLabel}처럼 보여요). 맞는지 확인해 주세요.`
-          : !result.color ? '색상은 확실하지 않아 비워 두었어요. 직접 입력해 주세요.' : '')
-        setAnalyzed(true)
-      }, () => {
-        if (version !== inputVersion.current || controller.signal.aborted) return
-        setError('사진을 분석하지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요.')
-      }).finally(() => {
-        if (version === inputVersion.current && !controller.signal.aborted) setAnalyzing(false)
-        if (analysisAbort.current === controller) analysisAbort.current = null
-      })
-      return
-    }
-    const sample = examples.find(example => example.key === selected)
-    const nextSuggestion = sample ? { title: sample.title, category: sample.category, color: sample.color } : { title: form.title || '테스트 물품', category: form.category, color: form.color || '검정' }
-    window.setTimeout(() => {
+    // Type, colour and title come from the photo model in this browser (nothing is uploaded for the analysis).
+    const controller = new AbortController()
+    analysisAbort.current = controller
+    void suggestItem(file, controller.signal).then(result => {
       if (version !== inputVersion.current) return
-      setSuggestion(nextSuggestion)
-      setAnalyzing(false)
+      setSuggestion({ title: result.title, category: result.category, color: result.color })
+      setAiNote(!result.kindLabel ? '사진에서 물품을 알아보지 못했어요. 물품이 잘 보이게 다시 찍거나 직접 입력해 주세요.'
+        : !result.kindConfident ? `종류가 확실하지 않아요(${result.kindLabel}처럼 보여요). 맞는지 확인해 주세요.`
+        : !result.color ? '색상은 확실하지 않아 비워 두었어요. 직접 입력해 주세요.' : '')
       setAnalyzed(true)
-    }, 750)
+    }, () => {
+      if (version !== inputVersion.current || controller.signal.aborted) return
+      setError('사진을 분석하지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요.')
+    }).finally(() => {
+      if (version === inputVersion.current && !controller.signal.aborted) setAnalyzing(false)
+      if (analysisAbort.current === controller) analysisAbort.current = null
+    })
   }
   function nextStep(event: React.FormEvent) {
     event.preventDefault()
@@ -200,7 +192,7 @@ export default function RegisterPage() {
           <div className="register-photo-row"><div className="register-photo"><img src={image} alt="등록할 물품 미리보기" /><span><FileImage size={14} /> {selected ? '가상 샘플' : '선택한 사진'}</span></div><button type="button" className="photo-upload" onClick={() => fileInput.current?.click()}><ImagePlus size={30} strokeWidth={1.6} /><strong>사진 업로드</strong><span>JPG, PNG, WebP · 최대 10MB</span></button><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="물품 사진 선택" onChange={event => choosePhoto(event.target.files?.[0])} /></div>
           <p className="photo-file-name"><Camera size={14} /> {fileName}</p>
           <div className="register-examples"><span>샘플로 빠르게 체험하기</span><div>{examples.map(example => <button type="button" key={example.key} onClick={() => chooseExample(example.key)} className={selected === example.key ? 'selected' : ''}>{example.label}</button>)}</div></div>
-          <div className="analysis-panel"><div className="analysis-panel-top"><span className="analysis-icon"><Sparkles size={21} /></span><div><strong>AI가 찾아주는 물품의 특징</strong><p>{imageFile ? '올린 사진을 이 기기 안에서 AI가 분석해 종류·색상·물품명을 제안해요. 사진은 분석을 위해 밖으로 보내지 않아요.' : '샘플은 미리 준비된 값을 보여 줘요. 내 사진을 올리면 AI가 직접 분석해요.'}</p></div><span className="badge badge-blue">{imageFile ? 'AI' : '데모'}</span></div>{analyzed ? <><dl className="analysis-results"><div><dt>물품명</dt><dd>{suggestion.title || '직접 입력해 주세요'}</dd></div><div><dt>종류</dt><dd>{suggestion.category || '직접 입력해 주세요'}</dd></div><div><dt>색상</dt><dd>{suggestion.color || '직접 입력해 주세요'}</dd></div></dl>{aiNote && <p className="register-ai-note" role="status">{aiNote}</p>}<button type="button" className="button analysis-apply" onClick={() => { setForm(previous => ({ ...previous, title: suggestion.title || previous.title, category: suggestion.category || previous.category, color: suggestion.color || (imageFile ? '' : previous.color) })); setError('') }}><Check size={16} /> 이 정보로 입력하기</button></> : <button type="button" disabled={analyzing} onClick={simulateAnalysis} className="button analysis-apply"><Sparkles size={16} className={analyzing ? 'pulse-icon' : ''} /> {analyzing ? (imageFile ? 'AI가 사진을 분석하고 있어요… (처음에는 준비에 시간이 걸려요)' : '샘플 특징을 준비하고 있어요…') : (imageFile ? 'AI로 사진 분석하기' : 'AI 분석 시뮬레이션 실행')}</button>}</div>
+          <div className="analysis-panel"><div className="analysis-panel-top"><span className="analysis-icon"><Sparkles size={21} /></span><div><strong>AI가 찾아주는 물품의 특징</strong><p>사진을 올리면 이 기기 안에서 AI가 종류·색상·물품명을 분석해 제안해요. 사진은 분석을 위해 밖으로 보내지 않아요.</p></div><span className="badge badge-blue">AI</span></div>{analyzed ? <><dl className="analysis-results"><div><dt>물품명</dt><dd>{suggestion.title || '직접 입력해 주세요'}</dd></div><div><dt>종류</dt><dd>{suggestion.category || '직접 입력해 주세요'}</dd></div><div><dt>색상</dt><dd>{suggestion.color || '직접 입력해 주세요'}</dd></div></dl>{aiNote && <p className="register-ai-note" role="status">{aiNote}</p>}<button type="button" className="button analysis-apply" onClick={() => { setForm(previous => ({ ...previous, title: suggestion.title || previous.title, category: suggestion.category || previous.category, color: suggestion.color || (imageFile ? '' : previous.color) })); setError('') }}><Check size={16} /> 이 정보로 입력하기</button></> : <button type="button" disabled={analyzing} onClick={() => analyzePhoto()} className="button analysis-apply"><Sparkles size={16} className={analyzing ? 'pulse-icon' : ''} /> {analyzing ? 'AI가 사진을 분석하고 있어요… (처음에는 준비에 시간이 걸려요)' : imageFile ? 'AI로 사진 분석하기' : '사진 올리고 AI 분석하기'}</button>}</div>
           <div className="journey-section-title register-section-divider"><span>02</span><div><h2>기억나는 정보를 알려 주세요</h2><p className="muted"><span className="required-star">*</span> 표시는 필수 입력 항목이에요.</p></div></div>
           <div className="register-fields"><div className="form-field span-two"><label htmlFor="item-title">물품명 <span className="required-star">*</span></label><input id="item-title" value={form.title} onChange={event => update('title', event.target.value)} maxLength={60} placeholder="예) 검은색 가죽 지갑" required /></div><div className="form-field"><label htmlFor="item-category">종류 <span className="required-star">*</span></label><select id="item-category" value={form.category} onChange={event => update('category', event.target.value)}>{categories.map(category => <option key={category}>{category}</option>)}</select></div><div className="form-field"><label htmlFor="item-color">색상 <span className="required-star">*</span></label><input id="item-color" value={form.color} onChange={event => update('color', event.target.value)} maxLength={25} placeholder="예) 검정" required /></div><div className="form-field"><label htmlFor="item-date">{found ? '습득' : '분실'} 날짜 <span className="required-star">*</span></label><input id="item-date" type="date" max={todayInKorea()} value={form.date} onChange={event => update('date', event.target.value)} required /></div><div className="form-field"><label htmlFor="item-region">지역 <span className="required-star">*</span></label><select id="item-region" aria-describedby={locationMismatch ? 'item-location-warning' : undefined} value={form.region} onChange={event => update('region', event.target.value)}>{regions.map(region => <option key={region}>{region}</option>)}</select></div><div className="form-field span-two register-location-field"><label htmlFor="item-location">상세 장소 <span className="required-star">*</span></label><input id="item-location" value={form.location} onChange={event => update('location', event.target.value)} maxLength={100} placeholder="예: 성남시 단대오거리역 2번 출구 앞" aria-describedby={locationMismatch ? 'item-location-help item-location-warning' : 'item-location-help'} required /><small id="item-location-help" className="register-location-help">실제 분실·습득 장소를 직접 입력해 주세요.</small>{locationMismatch && <p id="item-location-warning" className="register-location-warning" role="status"><Info size={17} aria-hidden="true" /><span>선택한 지역과 입력한 장소가 다른 것 같아요. 위치를 다시 확인해 주세요.</span></p>}{locationReset && <small role="status" className="register-location-help">장소가 변경되어 이전 지도 선택을 해제했어요. 필요하면 다시 선택해 주세요.</small>}<RegistrationLocationPicker location={form.location} selected={selectedLocation} onClear={() => { setSelectedLocation(null); setLocationReset(false) }} onConfirm={selection => { setForm(previous => ({ ...previous, location: selection.location, ...(selection.region ? { region: selection.region } : {}) })); setSelectedLocation(selection); setLocationReset(false); setError('') }} /></div></div>
         </> : <>
