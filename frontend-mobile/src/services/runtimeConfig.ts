@@ -5,6 +5,8 @@
  */
 const ALLOWED_RUNTIME_API = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
 let runtimeApiBaseUrl: string | null = null;
+const REFRESH_INTERVAL_MS = 30_000;
+let lastRefreshAt = -Infinity;
 
 export function getRuntimeApiBaseUrl(): string | null {
   return runtimeApiBaseUrl;
@@ -39,7 +41,18 @@ export async function loadRuntimeApiBaseUrl(
   }
 }
 
+/**
+ * Re-reads the config after a failed request, at most every 30 seconds, so a visitor who opened the
+ * site before the tunnel restarted moves to the new address without reloading.
+ */
+export async function refreshRuntimeApiBaseUrl(fetcher: typeof fetch = fetch, now = Date.now()): Promise<string | null> {
+  if (!import.meta.env.VITE_API_CONFIG_URL?.trim() || now - lastRefreshAt < REFRESH_INTERVAL_MS) return null;
+  lastRefreshAt = now;
+  return loadRuntimeApiBaseUrl(undefined, fetcher, 3000, now);
+}
+
 /** Test helper. */
 export function resetRuntimeApiBaseUrl(): void {
   runtimeApiBaseUrl = null;
+  lastRefreshAt = -Infinity;
 }

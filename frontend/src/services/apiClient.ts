@@ -1,4 +1,4 @@
-import { getRuntimeApiBaseUrl } from './runtimeConfig';
+import { getRuntimeApiBaseUrl, refreshRuntimeApiBaseUrl } from './runtimeConfig';
 import { getTunnelHeaders } from './tunnel';
 
 export interface ApiHealthResponse {
@@ -35,6 +35,15 @@ export class ApiClientError extends Error {
 /** Vite substitutes this public setting at startup/build time; it must not contain secrets. */
 export function getApiBaseUrl(): string {
   return getRuntimeApiBaseUrl() ?? (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+}
+
+const TIMEOUT_MESSAGE = '서버 응답이 늦어지고 있어요. 잠시 후 다시 시도해 주세요.';
+
+/** Visitor-facing: the visitor's own connection when the browser knows it is offline, otherwise the server. */
+function connectionErrorMessage(): string {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
+    ? '인터넷 연결이 끊겨 있어요. 연결을 확인한 뒤 다시 시도해 주세요.'
+    : '서버에 잠시 연결할 수 없어요. 1~2분 뒤 다시 시도해 주세요.';
 }
 
 function healthUrl(baseUrl: string): string {
@@ -88,14 +97,14 @@ export async function checkApiHealth(options: { baseUrl?: string; timeoutMs?: nu
     if (!body || typeof body !== 'object' || !('status' in body) || body.status !== 'OK' || !('service' in body) || body.service !== 'LOST QUEST API') {
       throw new ApiClientError('INVALID_RESPONSE', '예상한 LOST QUEST API 응답이 아니에요. 서버 주소와 응답 형식을 확인해 주세요.');
     }
-    if (timedOut) throw new ApiClientError('TIMEOUT', '서버 응답 시간이 초과되었어요. 서버 실행 상태를 확인한 뒤 다시 시도해 주세요.');
+    if (timedOut) throw new ApiClientError('TIMEOUT', TIMEOUT_MESSAGE);
     return { status: 'OK', service: 'LOST QUEST API' };
   } catch (error) {
     if (timedOut) {
-      throw new ApiClientError('TIMEOUT', '서버 응답 시간이 초과되었어요. 서버 실행 상태를 확인한 뒤 다시 시도해 주세요.');
+      throw new ApiClientError('TIMEOUT', TIMEOUT_MESSAGE);
     }
     if (error instanceof ApiClientError) throw error;
-    throw new ApiClientError('NETWORK_ERROR', '서버에 연결하지 못했어요. 백엔드 실행 상태, API 주소와 CORS 설정을 확인해 주세요.');
+    throw new ApiClientError('NETWORK_ERROR', connectionErrorMessage());
   } finally {
     clearTimeout(timer);
   }
@@ -133,7 +142,22 @@ async function toHttpError(response: Response): Promise<ApiClientError> {
 
 /** Shared JSON request for the Spring Boot API. Callers validate the returned shape. */
 export async function apiRequest(path: string, options: ApiRequestOptions = {}): Promise<unknown> {
-  const url = apiUrl(options.baseUrl ?? getApiBaseUrl(), path);
+  const baseUrl = options.baseUrl ?? getApiBaseUrl();
+  try {
+    return await sendRequest(baseUrl, path, options);
+  } catch (error) {
+    // A restarted quick tunnel gets a new address while open pages still hold the old one. Retry once,
+    // only when the published address really moved: the old tunnel no longer reaches the server.
+    if (options.baseUrl !== undefined || !(error instanceof ApiClientError) || error.code !== 'NETWORK_ERROR') throw error;
+    await refreshRuntimeApiBaseUrl();
+    const movedTo = getApiBaseUrl();
+    if (movedTo === baseUrl) throw error;
+    return sendRequest(movedTo, path, options);
+  }
+}
+
+async function sendRequest(baseUrl: string, path: string, options: ApiRequestOptions): Promise<unknown> {
+  const url = apiUrl(baseUrl, path);
   const timeoutMs = options.timeoutMs ?? 10_000;
   const headers: Record<string, string> = { Accept: 'application/json', ...getTunnelHeaders(url) };
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -167,9 +191,9 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}):
       throw new ApiClientError('INVALID_RESPONSE', '서버 응답을 읽지 못했어요. 잠시 후 다시 시도해 주세요.');
     }
   } catch (error) {
-    if (timedOut) throw new ApiClientError('TIMEOUT', '서버 응답 시간이 초과되었어요. 잠시 후 다시 시도해 주세요.');
+    if (timedOut) throw new ApiClientError('TIMEOUT', TIMEOUT_MESSAGE);
     if (error instanceof ApiClientError) throw error;
-    throw new ApiClientError('NETWORK_ERROR', '서버에 연결하지 못했어요. 백엔드 실행 상태와 API 주소를 확인해 주세요.');
+    throw new ApiClientError('NETWORK_ERROR', connectionErrorMessage());
   } finally {
     clearTimeout(timer);
   }

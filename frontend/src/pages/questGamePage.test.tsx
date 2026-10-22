@@ -8,6 +8,12 @@ import { addRankingEntry, cleanNickname, generateSimpleRound, getSimpleGrade, le
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Never reach a real server (a dev .env may point at the live API): these tests cover the device-only ranking.
+vi.mock('../services/gameRankingApi', () => ({
+  fetchRanking: vi.fn(() => Promise.reject(new Error('offline'))),
+  submitScore: vi.fn(() => Promise.reject(new Error('offline'))),
+}));
+
 describe('Simple Lost-and-Found Matching Game (QuestGamePage)', () => {
   let container: HTMLDivElement;
   let root: Root;

@@ -200,7 +200,7 @@ describe('MyItemList', () => {
     fetchMock.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
     await act(async () => { retryButton()!.click(); });
     await settle();
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('서버에 연결하지 못했어요');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('서버에 잠시 연결할 수 없어요');
     expect(cards()).toHaveLength(0);
   });
 
