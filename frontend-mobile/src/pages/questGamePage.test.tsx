@@ -12,6 +12,7 @@ import { addRankingEntry, cleanNickname, generateSimpleRound, getSimpleGrade, le
 vi.mock('../services/gameRankingApi', () => ({
   fetchRanking: vi.fn(() => Promise.reject(new Error('offline'))),
   submitScore: vi.fn(() => Promise.reject(new Error('offline'))),
+  refusedRunMessage: vi.fn(() => null),
 }));
 
 describe('Simple Lost-and-Found Matching Game (QuestGamePage)', () => {

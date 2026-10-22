@@ -234,6 +234,8 @@ export function saveSimpleRecord(record: SimpleGameRecord): void {
 
 /** Local (this device only) top-10 ranking. Nothing is sent to a server. */
 export interface RankingEntry {
+  /** Server record id (shared ranking only); administrators delete by it. */
+  id?: number;
   nickname: string;
   score: number;
   solved: number;
