@@ -55,15 +55,41 @@ function backendAnswers(): Promise<boolean> {
   return keywordHealthCheck;
 }
 
+const KEYWORD_FALLBACK_PAGES = 3;
+const KEYWORD_FALLBACK_SIZE = 50;
+const squash = (text: string | undefined) => (text ?? '').replace(/\s+/g, '').toLowerCase();
+
+/**
+ * The 경찰청 lost-item keyword API is down while its date listing still works: look for the keyword (every word of it)
+ * in the newest listing pages. Null when those pages cannot be read either.
+ */
+export async function recentLostMatches(keyword: string): Promise<SourceState | null> {
+  const pages = await Promise.allSettled(Array.from({ length: KEYWORD_FALLBACK_PAGES },
+    (_, index) => listPoliceItems('lost', { page: index + 1, size: KEYWORD_FALLBACK_SIZE })));
+  const seen = new Set<string>();
+  const items = pages.flatMap(page => page.status === 'fulfilled' ? page.value.items : [])
+    .filter(item => !seen.has(item.id) && seen.add(item.id));
+  if (!items.length) return null;
+  const words = keyword.split(/\s+/).map(squash).filter(Boolean);
+  const hits = items.filter(item => {
+    const text = squash([item.title, item.category, item.description].join(' '));
+    return words.every(word => text.includes(word));
+  });
+  return { ...idleSource, status: 'ready', dataStatus: 'live', items: hits, page: 1, totalPages: 1, totalCount: hits.length,
+    lastSyncedAt: Date.now(), keywordFallback: { keyword, scanned: items.length } };
+}
+
 export async function loadPolicePublicList(type: ItemType, query: PoliceQuery, shouldStore: () => boolean = () => true): Promise<SourceState> {
   const { refresh: _refresh, ...conditions } = query;
   const state = await loadPublicList({ kind: type === 'lost' ? 'policeLost' : 'policeFound', query: { ...conditions }, page: query.page ?? 1, size: query.size ?? 50 },
     () => listPoliceItems(type, query), shouldStore);
-  // A first-page 경찰청 분실물 keyword search that failed like a connection outage: tell a search-only failure
-  // (LOST QUEST still answers) apart from a real outage. Unknown or failed checks keep the general notice.
-  if (type === 'lost' && query.q?.trim() && (query.page ?? 1) === 1 && state.status === 'error' && state.dataStatus === 'unavailable' && !state.errorCode
-    && await backendAnswers()) {
-    return { ...state, backendReachable: true };
-  }
-  return state;
+  const keyword = query.q?.trim();
+  if (type !== 'lost' || !keyword || (query.page ?? 1) !== 1 || state.status !== 'error') return state;
+  // Only a search-only failure (the server said so, or it failed like an outage while /api/health answers) gets the
+  // fallback; a real outage keeps the general notice. Unknown or failed checks keep it too.
+  const searchOnly = state.errorCode === 'EXTERNAL_API_ERROR'
+    || (state.dataStatus === 'unavailable' && !state.errorCode && await backendAnswers());
+  if (!searchOnly) return state;
+  const fallback = await recentLostMatches(keyword).catch(() => null);
+  return fallback ?? (state.errorCode ? state : { ...state, backendReachable: true });
 }

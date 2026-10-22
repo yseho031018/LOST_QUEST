@@ -28,6 +28,8 @@ export interface SourceState {
   errorCode?: string;
   /** A keyword request failed as a connection error, yet /api/health answered right after (the tunnel hid the server's reply). */
   backendReachable?: boolean;
+  /** The keyword search was down, so these items were picked from the newest date-listing pages instead. */
+  keywordFallback?: { keyword: string; scanned: number };
   refreshing?: boolean;
   refreshError?: string;
 }
