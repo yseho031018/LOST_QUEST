@@ -25,6 +25,7 @@ import {
   type SimpleGameRecord,
   type SimpleItemCard,
 } from '../services/questGameData';
+import { fetchRanking, submitScore } from '../services/gameRankingApi';
 import './QuestGamePage.css';
 
 const GAME_TIME_SEC = 60;
@@ -46,9 +47,9 @@ const playedDate = (iso: string) => {
 };
 
 /** Local top-10 table; `highlight` marks the entry just saved. */
-function RankingBoard({ ranking, highlight }: { ranking: RankingEntry[]; highlight?: string }) {
+function RankingBoard({ ranking, highlight, shared }: { ranking: RankingEntry[]; highlight?: string; shared: boolean }) {
   return <section className="quest-ranking" aria-label="랭킹">
-    <div className="quest-ranking-head"><h3><ListOrdered size={17} /> 랭킹 TOP {RANKING_SIZE}</h3><small>이 기기에서 플레이한 기록</small></div>
+    <div className="quest-ranking-head"><h3><ListOrdered size={17} /> 랭킹 TOP {RANKING_SIZE}</h3><small>{shared ? '모든 방문자의 기록' : '이 기기에서 플레이한 기록'}</small></div>
     {ranking.length === 0
       ? <p className="quest-ranking-empty">아직 기록이 없어요. 첫 번째 탐정이 되어 보세요!</p>
       : <ol className="quest-ranking-list">
@@ -77,6 +78,14 @@ export default function QuestGamePage() {
   const [timeLeft, setTimeLeft] = useState<number>(GAME_TIME_SEC);
   const [muted, setMuted] = useState<boolean>(false);
   const [ranking, setRanking] = useState<RankingEntry[]>(() => loadRanking());
+  // True once the shared (server) ranking replaced this device's list; the device list stays when it cannot be read.
+  const [sharedRanking, setSharedRanking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchRanking().then(list => { if (!cancelled) { setRanking(list); setSharedRanking(true); } }, () => {});
+    return () => { cancelled = true; };
+  }, []);
   const [nickname, setNickname] = useState<string>(() => loadLastNickname());
   const [nicknameError, setNicknameError] = useState('');
   // The finished game's result, and where it landed once saved (one save per game).
@@ -192,15 +201,30 @@ export default function QuestGamePage() {
   }, [currentRound.choices, handlePickCard, phase]);
 
   const canRank = phase === 'over' && lastResult !== null && !saved && qualifiesForRanking(lastResult.score, ranking);
-  const saveRanking = (event: FormEvent) => {
+  const saveRanking = async (event: FormEvent) => {
     event.preventDefault();
-    if (!lastResult || saved) return;
+    if (!lastResult || saved || submitting) return;
     const name = cleanNickname(nickname);
     if (!name) { setNicknameError('닉네임을 1~12자로 입력해 주세요.'); return; }
-    const entry: RankingEntry = { nickname: name, score: lastResult.score, solved: lastResult.solved, bestCombo: lastResult.bestCombo, playedAt: new Date().toISOString() };
-    const result = addRankingEntry(entry);
     saveLastNickname(name);
     setNickname(name);
+    const run = { nickname: name, score: lastResult.score, solved: lastResult.solved, bestCombo: lastResult.bestCombo };
+    if (sharedRanking) {
+      setSubmitting(true);
+      try {
+        const result = await submitScore(run);
+        setRanking(result.ranking);
+        setSaved({ rank: result.rank, playedAt: result.entry.playedAt });
+        return;
+      } catch {
+        // The server could not take it: keep the run on this device instead of losing it.
+        setSharedRanking(false);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+    const entry: RankingEntry = { ...run, playedAt: new Date().toISOString() };
+    const result = addRankingEntry(entry);
     setRanking(result.ranking);
     setSaved({ rank: result.rank, playedAt: entry.playedAt });
   };
@@ -272,7 +296,7 @@ export default function QuestGamePage() {
             <button type="button" className="button button-primary quest-start" onClick={startGame}><Play size={17} />게임 시작</button>
             {record.bestScore > 0 && <small className="quest-best">내 최고 기록 {record.bestScore.toLocaleString()}점 · 최고 콤보 {record.bestCombo} · 지금까지 {record.totalSolved}건 해결</small>}
           </div>
-          <RankingBoard ranking={ranking} highlight={saved?.playedAt} />
+          <RankingBoard ranking={ranking} highlight={saved?.playedAt} shared={sharedRanking} />
           </div>
         )}
 
@@ -328,11 +352,11 @@ export default function QuestGamePage() {
               <div className="quest-nickname-row">
                 <input id="quest-nickname" value={nickname} maxLength={NICKNAME_MAX} autoComplete="nickname" placeholder={`닉네임 (최대 ${NICKNAME_MAX}자)`}
                   onChange={(event) => { setNickname(event.target.value); setNicknameError(''); }} aria-invalid={nicknameError ? true : undefined} aria-describedby={nicknameError ? 'quest-nickname-error' : undefined} />
-                <button type="submit" className="button button-primary">랭킹 등록</button>
+                <button type="submit" className="button button-primary" disabled={submitting}>{submitting ? '등록 중…' : '랭킹 등록'}</button>
               </div>
               {nicknameError && <small id="quest-nickname-error" role="alert">{nicknameError}</small>}
             </form>}
-            {saved && <p className="quest-saved" role="status">{saved.rank ? <><Crown size={16} /> <strong>{nickname}</strong> 님이 <strong>{saved.rank}위</strong>에 올랐어요!</> : '랭킹에 저장했어요.'}</p>}
+            {saved && <p className="quest-saved" role="status">{saved.rank && saved.rank <= RANKING_SIZE ? <><Crown size={16} /> <strong>{nickname}</strong> 님이 <strong>{saved.rank}위</strong>에 올랐어요!</> : saved.rank ? `전체 ${saved.rank.toLocaleString()}위로 저장했어요.` : '랭킹에 저장했어요.'}</p>}
             {!canRank && !saved && lastResult && lastResult.score > 0 && ranking.length >= RANKING_SIZE && <p className="quest-saved is-muted">{RANKING_SIZE}위 기록({ranking[ranking.length - 1].score.toLocaleString()}점)을 넘기면 랭킹에 오를 수 있어요.</p>}
             <div className="button-row quest-over-actions">
               <button type="button" className="button button-primary" onClick={startGame}><RefreshCw size={16} />다시 플레이하기</button>
