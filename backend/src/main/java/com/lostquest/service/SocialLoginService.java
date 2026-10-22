@@ -46,22 +46,32 @@ public class SocialLoginService {
     }
 
     /**
-     * A linked provider account signs straight in. A new one creates a password-less USER with the provider's
-     * verified email, or with {@code enteredEmail} when the provider has none. An email that already belongs to
-     * another account is never linked automatically: that account may not be the provider user's.
+     * A linked provider account signs straight in. A new one joins the existing account with the same email when
+     * the provider verified that email (expo decision: convenience over the pre-registration risk, since signup does
+     * not verify email), or creates a password-less USER. An email the visitor typed in is never linked: it is unproven.
      */
     private SocialLoginResponse signIn(SocialIdentity identity, String enteredEmail) {
         Optional<SocialAccount> linked = socialAccountRepository.findByProviderAndProviderUserId(identity.provider(), identity.providerUserId());
         if (linked.isPresent()) {
             return issue(linked.get().getUser());
         }
-        String email = identity.email() != null ? identity.email() : enteredEmail;
+        boolean verifiedByProvider = identity.email() != null;
+        String email = verifiedByProvider ? identity.email() : enteredEmail;
         if (email == null) {
             return SocialLoginResponse.emailRequired();
         }
         email = email.trim().toLowerCase(Locale.ROOT);
-        if (userRepository.existsByEmail(email)) {
-            throw new DuplicateEmailException("이미 가입된 이메일이에요. 기존 계정은 이메일과 비밀번호로 로그인해 주세요.");
+        Optional<User> existing = userRepository.findByEmail(email);
+        if (existing.isPresent()) {
+            User user = existing.get();
+            if (!verifiedByProvider) {
+                throw new DuplicateEmailException("이미 가입된 이메일이에요. 기존 계정은 이메일과 비밀번호로 로그인해 주세요.");
+            }
+            if (socialAccountRepository.existsByUserIdAndProvider(user.getId(), identity.provider())) {
+                throw new DuplicateEmailException("이 계정에는 다른 구글 계정이 이미 연결되어 있어요. 이메일과 비밀번호로 로그인해 주세요.");
+            }
+            socialAccountRepository.saveAndFlush(new SocialAccount(user, identity.provider(), identity.providerUserId()));
+            return issue(user);
         }
         // A concurrent first sign-in for the same email or provider account hits a unique key and is reported as 409.
         User user = userRepository.save(User.withoutPassword(email, nickname(identity.name()), UserRole.USER));

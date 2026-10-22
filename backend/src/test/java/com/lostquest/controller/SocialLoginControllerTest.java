@@ -97,20 +97,38 @@ class SocialLoginControllerTest {
     }
 
     @Test
-    void googleEmailOfAnExistingPasswordAccountIsNotLinked() throws Exception {
-        mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+    void googleVerifiedEmailOfAnExistingPasswordAccountLinksAndSignsIntoIt() throws Exception {
+        long existingId = json(mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("email", "hunter@gmail.com", "password", "Quest1234!", "nickname", "기존"))))
-                .andExpect(status().isCreated());
-        googleReturns("google-1", "hunter@gmail.com", "헌터");
+                .andExpect(status().isCreated())).get("id").asLong();
+        googleReturns("google-1", "Hunter@gmail.com", "헌터");
 
         googleLogin(null)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
-                .andExpect(jsonPath("$.message").value("이미 가입된 이메일이에요. 기존 계정은 이메일과 비밀번호로 로그인해 주세요."));
-        assertThat(socialAccountRepository.count()).isZero();
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SIGNED_IN"))
+                .andExpect(jsonPath("$.user.id").value(existingId))
+                .andExpect(jsonPath("$.user.nickname").value("기존"))
+                .andExpect(jsonPath("$.user.hasPassword").value(true));
+        assertThat(userRepository.count()).isEqualTo(1);
+        assertThat(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, "google-1"))
+                .hasValueSatisfying(account -> assertThat(account.getUser().getId()).isEqualTo(existingId));
+        // Both ways keep working.
+        googleLogin(null).andExpect(status().isOk()).andExpect(jsonPath("$.user.id").value(existingId));
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("email", "hunter@gmail.com", "password", "Quest1234!"))))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void aSecondGoogleAccountWithTheSameEmailIsNotLinked() throws Exception {
+        googleReturns("google-1", "hunter@gmail.com", "헌터");
+        googleLogin(null).andExpect(status().isOk());
+        googleReturns("google-9", "hunter@gmail.com", "다른 구글");
+
+        googleLogin(null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"));
+        assertThat(socialAccountRepository.count()).isEqualTo(1);
     }
 
     @Test
