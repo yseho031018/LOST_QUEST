@@ -24,17 +24,19 @@ const REQUEST: ReturnRequest = { id: '11', itemId: ITEM.id, status: 'approved', 
 let container: HTMLDivElement;
 let root: Root;
 let stopTrack: ReturnType<typeof vi.fn>;
+let drawImage: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.useFakeTimers();
   scan.results = [];
   stopTrack = vi.fn();
+  drawImage = vi.fn();
   app.value = { items: [ITEM], requests: [REQUEST], isLoggedIn: true, authUser: { id: 2, role: 'USER' }, activityLoading: false,
     verifyOwner: vi.fn(), verifyQr: vi.fn().mockResolvedValue(undefined), renewQr: vi.fn(), refreshData: vi.fn().mockResolvedValue(undefined) };
   vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }) } });
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(640);
   vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(480);
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn(), getImageData: () => ({}) } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage, getImageData: () => ({}) } as unknown as CanvasRenderingContext2D);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -63,6 +65,16 @@ describe('scanning the requester\'s QR with the camera', () => {
     expect(container.querySelector('.qr-scanner')).toBeNull();
     expect(stopTrack).toHaveBeenCalled();
     expect(container.textContent).toContain('QR을 확인했어요');
+  });
+
+  it('paints the camera preview onto a canvas so it is never a black box', async () => {
+    await render();
+    await act(async () => { button('카메라로 QR 스캔').click(); });
+    await frames(1);
+    const preview = container.querySelector<HTMLCanvasElement>('.qr-scanner-preview')!;
+    expect(preview.width).toBe(480);
+    // Centre square of the 640x480 camera frame, scaled onto the 480px preview.
+    expect(drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 80, 0, 480, 480, 0, 0, 480, 480);
   });
 
   it('keeps scanning and says why when another request\'s QR is shown', async () => {
