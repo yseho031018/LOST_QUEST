@@ -14,10 +14,14 @@ public class CommunityWriteLimiter {
     private final Clock clock;
     public CommunityWriteLimiter() { this(Clock.systemUTC()); }
     CommunityWriteLimiter(Clock clock) { this.clock = clock; }
-    public synchronized void check(Long userId, String action, int limit) {
+    public void check(Long userId, String action, int limit) {
+        check(String.valueOf(userId), action, limit);
+    }
+    /** Same window for callers without an account, keyed by e.g. the visitor's address. */
+    public synchronized void check(String subject, String action, int limit) {
         long now = clock.millis();
         windows.entrySet().removeIf(e -> now - e.getValue().startedAt() >= 60_000);
-        String key = userId + ":" + action;
+        String key = subject + ":" + action;
         Window old = windows.get(key);
         if ((old != null && old.count() >= limit) || (old == null && windows.size() >= 10_000))
             throw new CommunityRateLimitException();

@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import QuestGamePage from './QuestGamePage';
 import { fetchRanking, submitScore } from '../services/gameRankingApi';
 import { loadRanking, type RankingEntry } from '../services/questGameData';
+import { ApiClientError } from '../services/apiClient';
 
-vi.mock('../services/gameRankingApi', () => ({ fetchRanking: vi.fn(), submitScore: vi.fn() }));
+vi.mock('../services/gameRankingApi', async importOriginal => ({ ...await importOriginal<typeof import('../services/gameRankingApi')>(), fetchRanking: vi.fn(), submitScore: vi.fn() }));
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const entry = (nickname: string, score: number, playedAt = '2026-10-22T01:00:00.000Z'): RankingEntry => ({ nickname, score, solved: 3, bestCombo: 2, playedAt });
@@ -80,6 +81,21 @@ describe('shared 미니게임 ranking', () => {
     expect(loadRanking()).toEqual([expect.objectContaining({ nickname: '왓슨', score: 100 })]);
     await act(async () => { button('랭킹 보기').click(); });
     expect(container.querySelector('.quest-ranking')!.textContent).toContain('이 기기에서 플레이한 기록');
+  });
+
+  it('shows why the server refused a nickname and keeps the form open instead of saving on the device', async () => {
+    vi.mocked(fetchRanking).mockResolvedValue([]);
+    vi.mocked(submitScore).mockRejectedValueOnce(new ApiClientError('HTTP_ERROR', '입력값을 확인해 주세요.', 400, { fieldErrors: [{ field: 'nickname', message: '사용할 수 없는 닉네임이에요. 다른 닉네임을 입력해 주세요.' }] }));
+    await finishWithScore(1);
+    await typeNickname('나쁜말');
+    await act(async () => { button('랭킹 등록').click(); });
+    expect(container.querySelector('#quest-nickname-error')?.textContent).toBe('사용할 수 없는 닉네임이에요. 다른 닉네임을 입력해 주세요.');
+    expect(loadRanking()).toEqual([]);
+    const mine = entry('왓슨', 100, '2026-10-22T05:00:00.000Z');
+    vi.mocked(submitScore).mockResolvedValueOnce({ rank: 1, entry: mine, ranking: [mine] });
+    await typeNickname('왓슨');
+    await act(async () => { button('랭킹 등록').click(); });
+    expect(text()).toContain('왓슨 님이 1위에 올랐어요!');
   });
 
   it('falls back to this device\'s ranking when the server ranking cannot be read', async () => {

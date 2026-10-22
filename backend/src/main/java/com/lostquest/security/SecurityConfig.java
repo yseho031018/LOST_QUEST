@@ -55,6 +55,7 @@ public class SecurityConfig {
                         // 미니게임 ranking: anyone can read it and submit a run with a nickname (no account).
                         .requestMatchers(HttpMethod.GET, "/api/game/ranking").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/game/scores").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/game/scores/{id}").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/community/posts", "/api/community/posts/{id}", "/api/community/posts/{id}/comments").permitAll()
                         .requestMatchers("/api/community/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/public-items/image").authenticated()

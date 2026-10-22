@@ -25,7 +25,7 @@ import {
   type SimpleGameRecord,
   type SimpleItemCard,
 } from '../services/questGameData';
-import { fetchRanking, submitScore } from '../services/gameRankingApi';
+import { fetchRanking, submitScore, refusedRunMessage } from '../services/gameRankingApi';
 import './QuestGamePage.css';
 
 const GAME_TIME_SEC = 60;
@@ -216,7 +216,9 @@ export default function QuestGamePage() {
         setRanking(result.ranking);
         setSaved({ rank: result.rank, playedAt: result.entry.playedAt });
         return;
-      } catch {
+      } catch (error) {
+        const refused = refusedRunMessage(error);
+        if (refused) { setNicknameError(refused); return; }
         // The server could not take it: keep the run on this device instead of losing it.
         setSharedRanking(false);
       } finally {
