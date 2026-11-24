@@ -194,7 +194,7 @@ export default function SearchPage() {
     next.set('source', nextSource);
     if (nextSource === 'public') next.set('type', nextType ?? 'lost');
     else if (nextType) next.set('type', nextType);
-    else if (source === 'public') next.delete('type');
+    else next.delete('type');
     paramsRef.current = next;
     setParams(next);
   };
@@ -239,10 +239,10 @@ export default function SearchPage() {
     {source === 'community' ? <>
       <div className="source-tabs" role="group" aria-label="LOST QUEST 검색">{(['found', 'lost'] as const).map(communityType => {
         // Named from the visitor's side: 내 물건 찾기 lists found posts (주인을 찾아요), 주인 찾기 lists lost posts (찾고 있어요).
-        // Without a type both LOST QUEST lists are shown, so both tabs read as selected.
-        const selected = !type || type === communityType;
+        // Default (no type): neither tab selected, both lists shown. Click filters; click again clears back to all.
+        const selected = type === communityType;
         const count = sources[communityType === 'lost' ? 'communityLost' : 'communityFound'].items.length;
-        return <button key={`community-${communityType}`} aria-pressed={selected} className={selected ? 'active' : ''} onClick={()=>selectSource('community', communityType)}>{communityType === 'found' ? '내 물건 찾기' : '주인 찾기'}{count > 0 && <span>{count}</span>}</button>;
+        return <button key={`community-${communityType}`} aria-pressed={selected} className={selected ? 'active' : ''} onClick={() => selectSource('community', selected ? undefined : communityType)}>{communityType === 'found' ? '내 물건 찾기' : '주인 찾기'}{count > 0 && <span>{count}</span>}</button>;
       })}</div>
     </> : <>
       <div className="search-police-bar">
