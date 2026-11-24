@@ -25,6 +25,16 @@ it('blocks da@ee in the signup form and shows the required address shape',async(
   expect(app.signup).not.toHaveBeenCalled();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('도메인과 확장자');
 });
+it('shows signup helper, password hint, and terms-styled consent links',()=>{
+  expect(container.querySelector('.auth-signup-helper')?.textContent).toContain('필수만 입력하면 바로 가입할 수 있어요');
+  expect(container.querySelector('.auth-password-hint')?.textContent).toContain('영문·숫자');
+  const terms=container.querySelector<HTMLAnchorElement>('a.auth-policy-link[href="#terms"]');
+  const privacy=container.querySelector<HTMLAnchorElement>('a.auth-policy-link[href="#privacy"]');
+  expect(terms?.textContent).toBe('이용약관');
+  expect(privacy?.textContent).toBe('개인정보 처리방침');
+  expect(container.querySelector('.auth-agree-main')?.textContent).toContain('이메일과 닉네임 저장에 동의해요');
+  expect(container.querySelector('.auth-agree-policies')).toBeTruthy();
+});
 it('submits a valid address after agreement',async()=>{
   await enter('#auth-nickname','회원'); await enter('#auth-email','hunter@gmail.com'); await enter('#auth-password','Quest1234!');
   await act(async()=>{container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();});
