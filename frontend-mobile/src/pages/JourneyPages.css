@@ -84,7 +84,7 @@
 .auth-agree input { width:15px; height:15px; flex-shrink:0; margin-top:2px; accent-color:#2874ed; }
 .auth-policy-link {
   color:#2874ed; font-weight:600; text-decoration:underline; text-underline-offset:2px;
-  cursor:pointer;
+  cursor:pointer; white-space:nowrap;
 }
 .auth-policy-link:hover { color:#1b5fcc; }
 .auth-google-email { margin-top:0; }
