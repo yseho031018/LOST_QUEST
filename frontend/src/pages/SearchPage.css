@@ -142,23 +142,6 @@
   pointer-events: none;
 }
 
-.search-page .search-police-bar {
-  display: flex;
-  align-items: center;
-  margin: -8px 0 20px;
-}
-
-.search-page .search-back-community {
-  min-height: 44px;
-  padding: 0 2px;
-  font-size: .875rem;
-  color: #647b8d;
-}
-
-.search-page .search-back-community:hover {
-  color: var(--blue);
-}
-
 .search-page .catalog-result-actions {
   display: flex;
   align-items: center;
