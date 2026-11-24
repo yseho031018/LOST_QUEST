@@ -52,7 +52,6 @@ const sourceTabs = () => [...container.querySelectorAll<HTMLButtonElement>('.sou
 const policeNavigation = () => container.querySelector<HTMLAnchorElement>('[data-testid="police-source-navigation"]');
 const backToCommunity = () => container.querySelector<HTMLButtonElement>('.search-back-community');
 // Community mode: [내 물건 찾기, 주인 찾기]. Police mode: [분실물, 습득물].
-const communityLostTab = () => sourceTabs().find(tab => tab.textContent?.startsWith('주인 찾기'))!;
 const policeLostTab = () => sourceTabs().find(tab => tab.textContent?.startsWith('분실물'))!;
 const policeFoundTab = () => sourceTabs().find(tab => tab.textContent?.startsWith('습득물'))!;
 const cards = () => [...container.querySelectorAll('a.item-card')].map(card => card.textContent);
@@ -74,7 +73,8 @@ describe('explicit police source loading', () => {
   it.each(['/search', '/search?source=all', '/search?source=community', '/search?source=unknown'])('defaults %s safely to LOST QUEST without police requests', async path => {
     await mount(path);
     expect(sourceTabs().map(tab => tab.textContent?.replace(/\d+$/, ''))).toEqual(['내 물건 찾기', '주인 찾기']);
-    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['true', 'true']);
+    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'false']);
+    expect(sourceTabs().every(tab => !tab.classList.contains('active'))).toBe(true);
     expect(container.querySelector('.search-police-entry')).toBeNull();
     expect(policeLostTab()).toBeUndefined(); expect(container.textContent).not.toContain('전체 물품');
     expect(cards()).toEqual([expect.stringContaining(own.title)]); expectNoPolice();
@@ -90,7 +90,7 @@ describe('explicit police source loading', () => {
     await change(container.querySelector<HTMLInputElement>('input[aria-label="시작 날짜"]')!, '2026-10-01');
     expect(cards()).toHaveLength(1); expectNoPolice();
     await click([...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '초기화')!);
-    expectNoPolice(); expect(communityLostTab().getAttribute('aria-pressed')).toBe('true');
+    expectNoPolice(); expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'false']);
   });
 
   it('starts list and code requests only when the police source URL is opened, with truthful loaded counts and source-specific controls', async () => {
@@ -202,18 +202,31 @@ describe('explicit police source loading', () => {
     expect(container.querySelector('.search-police-entry')).toBeNull();
     expect(cards()).toEqual([expect.stringContaining(own.title)]);
   });
-  it('names the LOST QUEST tabs from the visitor\'s side without a duplicate police entry', async () => {
+  it('defaults community tabs to all results and filters by type on click', async () => {
+    const found: Item = { ...own, id: 'api-found-1', type: 'found', title: '회원 가방', category: '가방' };
+    vi.mocked(listServerItems).mockImplementation(async type => type === 'lost' ? [own] : [found]);
     await mount('/search');
-    expect(sourceTabs().map(tab => tab.textContent)).toEqual(['내 물건 찾기', '주인 찾기1']);
-    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['true', 'true']);
+    expect(sourceTabs().map(tab => tab.textContent)).toEqual(['내 물건 찾기1', '주인 찾기1']);
+    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'false']);
+    expect(sourceTabs().map(tab => tab.classList.contains('active'))).toEqual([false, false]);
     expect(container.querySelector('.search-police-entry')).toBeNull();
+    expect(cards()).toEqual(expect.arrayContaining([expect.stringContaining(own.title), expect.stringContaining(found.title)]));
+    expect(cards()).toHaveLength(2);
     await click(sourceTabs()[0]);
     expect(container.querySelector('output')?.textContent).toBe('/search?source=community&type=found');
     expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
-    expect(cards()).toEqual([]);
+    expect(sourceTabs().map(tab => tab.classList.contains('active'))).toEqual([true, false]);
+    expect(cards()).toEqual([expect.stringContaining(found.title)]);
     await click(sourceTabs()[1]);
     expect(container.querySelector('output')?.textContent).toBe('/search?source=community&type=lost');
+    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(sourceTabs().map(tab => tab.classList.contains('active'))).toEqual([false, true]);
     expect(cards()).toEqual([expect.stringContaining(own.title)]);
+    await click(sourceTabs()[1]);
+    expect(container.querySelector('output')?.textContent).toBe('/search?source=community');
+    expect(sourceTabs().map(tab => tab.getAttribute('aria-pressed'))).toEqual(['false', 'false']);
+    expect(sourceTabs().map(tab => tab.classList.contains('active'))).toEqual([false, false]);
+    expect(cards()).toHaveLength(2);
     expectNoPolice();
   });
 

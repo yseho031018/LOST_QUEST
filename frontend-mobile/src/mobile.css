@@ -56,7 +56,8 @@ body{background:#e7edf2;overscroll-behavior-y:none}
 /* Pill-style segmented control shared by source/type tabs. */
 .app-shell .source-tabs,.app-shell .search-page .source-tabs{display:flex;gap:4px;padding:4px;margin:0 0 12px;border:0;border-radius:14px;background:#e9eef3}
 .app-shell .source-tabs>button,.app-shell .search-page .source-tabs>button{flex:1;min-height:40px;padding:6px 8px;margin:0;border:0;border-radius:11px;font-size:.8125rem;font-weight:600;color:#6f8291;gap:3px;flex-direction:column}
-.app-shell .source-tabs>button.active,.app-shell .search-page .source-tabs>button.active{background:#fff;color:var(--navy);box-shadow:0 1px 4px #15364e14}
+.app-shell .source-tabs>button::after,.app-shell .search-page .source-tabs>button::after{content:none;display:none}
+.app-shell .source-tabs>button.active,.app-shell .search-page .source-tabs>button.active,.app-shell .source-tabs>button[aria-pressed=true],.app-shell .search-page .source-tabs>button[aria-pressed=true]{background:#fff;color:var(--navy);box-shadow:0 1px 4px #15364e14}
 .app-shell .search-page .source-tabs>button>span{flex-basis:auto;font-size:.6875rem;color:#8ea0ad;padding:0;background:none}
 
 /* Search */
