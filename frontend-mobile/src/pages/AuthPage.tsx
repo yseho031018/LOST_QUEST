@@ -134,11 +134,13 @@ export default function AuthPage() {
       {isSignup && (
         <label className="auth-agree">
           <input type="checkbox" checked={agreed} onChange={event => { setAgreed(event.target.checked); setError('') }} />
-          <span>
-            이메일과 닉네임 저장에 동의해요.{' '}
-            <a className="auth-policy-link" href="#terms" onClick={openPolicyDoc}>이용약관</a>
-            {' · '}
-            <a className="auth-policy-link" href="#privacy" onClick={openPolicyDoc}>개인정보 처리방침</a>
+          <span className="auth-agree-copy">
+            <span className="auth-agree-main">이메일과 닉네임 저장에 동의해요.</span>
+            <span className="auth-agree-policies">
+              <a className="auth-policy-link" href="#terms" onClick={openPolicyDoc}>이용약관</a>
+              <span className="auth-policy-sep" aria-hidden="true">·</span>
+              <a className="auth-policy-link" href="#privacy" onClick={openPolicyDoc}>개인정보 처리방침</a>
+            </span>
           </span>
         </label>
       )}

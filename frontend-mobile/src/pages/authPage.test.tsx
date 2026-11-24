@@ -32,7 +32,8 @@ it('shows signup helper, password hint, and terms-styled consent links',()=>{
   const privacy=container.querySelector<HTMLAnchorElement>('a.auth-policy-link[href="#privacy"]');
   expect(terms?.textContent).toBe('이용약관');
   expect(privacy?.textContent).toBe('개인정보 처리방침');
-  expect(container.querySelector('.auth-agree')?.textContent).toContain('이메일과 닉네임 저장에 동의해요');
+  expect(container.querySelector('.auth-agree-main')?.textContent).toContain('이메일과 닉네임 저장에 동의해요');
+  expect(container.querySelector('.auth-agree-policies')).toBeTruthy();
 });
 it('submits a valid address after agreement',async()=>{
   await enter('#auth-nickname','회원'); await enter('#auth-email','hunter@gmail.com'); await enter('#auth-password','Quest1234!');
