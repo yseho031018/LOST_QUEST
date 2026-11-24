@@ -72,8 +72,21 @@
 .auth-input input[readonly] { color:#728292; background:#fbfcfd; }
 .auth-form-minimal .auth-input input::placeholder { color:#8a97a2; }
 .auth-submit { width:100%; margin-top:6px; justify-content:center; min-height:52px; border-radius:10px; }
+.auth-signup-helper {
+  margin:0 0 2px; text-align:center; color:#5f788c;
+  font-size:0.9375rem; font-weight:500; line-height:1.55; letter-spacing:-.02em;
+}
+.auth-password-hint {
+  margin:6px 0 0; padding-left:2px; color:#8499ab;
+  font-size:0.8125rem; font-weight:500; line-height:1.45; letter-spacing:-.01em;
+}
 .auth-agree { display:flex; align-items:flex-start; gap:9px; font-size:0.875rem!important; font-weight:400!important; line-height:1.7; color:#5f788c; }
 .auth-agree input { width:15px; height:15px; flex-shrink:0; margin-top:2px; accent-color:#2874ed; }
+.auth-policy-link {
+  color:#2874ed; font-weight:600; text-decoration:underline; text-underline-offset:2px;
+  cursor:pointer;
+}
+.auth-policy-link:hover { color:#1b5fcc; }
 .auth-google-email { margin-top:0; }
 .auth-step-back {
   display:inline-flex; align-items:center; gap:6px; align-self:flex-start;

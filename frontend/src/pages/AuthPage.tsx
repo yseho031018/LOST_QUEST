@@ -110,8 +110,14 @@ export default function AuthPage() {
     </nav>
   )
 
+  function openPolicyDoc(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
   const passwordForm = (
     <form onSubmit={submit} className="auth-form auth-form-minimal" noValidate>
+      {isSignup && <p className="auth-signup-helper">필수만 입력하면 바로 가입할 수 있어요</p>}
       {isSignup && <div className="form-field">
         <label className="sr-only" htmlFor="auth-nickname">닉네임</label>
         <div className="auth-input"><UserRound size={18} aria-hidden="true" /><input id="auth-nickname" value={nickname} onChange={edit(setNickname)} maxLength={20} autoComplete="nickname" placeholder="닉네임" /></div>
@@ -123,8 +129,19 @@ export default function AuthPage() {
       <div className="form-field">
         <label className="sr-only" htmlFor="auth-password">비밀번호</label>
         <div className="auth-input"><LockKeyhole size={18} aria-hidden="true" /><input id="auth-password" type="password" value={password} onChange={edit(setPassword)} maxLength={64} autoComplete={isSignup ? 'new-password' : 'current-password'} placeholder={isSignup ? '비밀번호 (8자 이상)' : '비밀번호'} /></div>
+        {isSignup && <p className="auth-password-hint">8자 이상 · 영문·숫자 포함 권장</p>}
       </div>
-      {isSignup && <label className="auth-agree"><input type="checkbox" checked={agreed} onChange={event => { setAgreed(event.target.checked); setError('') }} /><span>이메일과 닉네임 저장에 동의해요.</span></label>}
+      {isSignup && (
+        <label className="auth-agree">
+          <input type="checkbox" checked={agreed} onChange={event => { setAgreed(event.target.checked); setError('') }} />
+          <span>
+            이메일과 닉네임 저장에 동의해요.{' '}
+            <a className="auth-policy-link" href="#terms" onClick={openPolicyDoc}>이용약관</a>
+            {' · '}
+            <a className="auth-policy-link" href="#privacy" onClick={openPolicyDoc}>개인정보 처리방침</a>
+          </span>
+        </label>
+      )}
       {error && <p className="field-error" role="alert" style={{ whiteSpace: 'pre-line' }}>{error}</p>}
       <button type="submit" className="button button-primary auth-submit" disabled={submitting} aria-busy={submitting}>{submitting ? '처리 중이에요…' : isSignup ? '가입하기' : '로그인'}</button>
     </form>
