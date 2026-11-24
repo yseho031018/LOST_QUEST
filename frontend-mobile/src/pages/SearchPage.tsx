@@ -242,7 +242,7 @@ export default function SearchPage() {
         // Default (no type): neither tab selected, both lists shown. Click filters; click again clears back to all.
         const selected = type === communityType;
         const count = sources[communityType === 'lost' ? 'communityLost' : 'communityFound'].items.length;
-        return <button key={`community-${communityType}`} aria-pressed={selected} className={selected ? 'active' : ''} onClick={() => selectSource('community', selected ? undefined : communityType)}>{communityType === 'found' ? '내 물건 찾기' : '주인 찾기'}{count > 0 && <span>{count}</span>}</button>;
+        return <button key={`community-${communityType}`} type="button" aria-pressed={selected} className={selected ? 'active' : undefined} onClick={() => selectSource('community', selected ? undefined : communityType)}>{communityType === 'found' ? '내 물건 찾기' : '주인 찾기'}{count > 0 && <span>{count}</span>}</button>;
       })}</div>
       <div className="search-secondary-source">
         <button type="button" className="text-link search-police-entry" onClick={() => selectSource('public', 'lost')}>경찰청 공공데이터<ArrowRight size={16} aria-hidden="true"/></button>

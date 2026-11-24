@@ -104,8 +104,37 @@
 }
 
 .search-page .source-tabs > button {
+  position: relative;
   min-height: 48px;
   font-size: .875rem;
+  /* Unselected: shared track only — no per-tab underline. */
+  border-bottom: 0;
+  color: #8696a2;
+  font-weight: 500;
+}
+
+.search-page .source-tabs > button:not(.active):not([aria-pressed='true'])::after {
+  content: none;
+  display: none;
+}
+
+.search-page .source-tabs > button.active,
+.search-page .source-tabs > button[aria-pressed='true'] {
+  color: var(--navy);
+  font-weight: 650;
+}
+
+.search-page .source-tabs > button.active::after,
+.search-page .source-tabs > button[aria-pressed='true']::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--navy);
+  pointer-events: none;
 }
 
 .search-page .source-tabs > button > span {
